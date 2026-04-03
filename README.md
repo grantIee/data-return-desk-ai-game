@@ -85,7 +85,7 @@ For single-player:
 
 The server now prefers loading pre-generated customer profiles from `generated/` instead of regenerating the full dataset on startup. If no generated customers exist, it falls back to generation.
 
-For Vercel builds, `build.py` generates the dataset during the build if `generated/` is absent. `vercel.json` also rewrites all routes into the FastAPI function and explicitly includes the generated/static files in the bundle.
+For Vercel builds, `build.py` generates the dataset during the build if `generated/` is absent. `vercel.json` deploys the root [server.py](/Users/grantlee/Desktop/agentic-game/server.py) ASGI app directly and explicitly includes the generated/static files in the bundle.
 
 ## Storage Backends
 
