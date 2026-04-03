@@ -1,9 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "python build.py",
-  "functions": {
-    "server.py": {
-      "includeFiles": "{generated/**,static/**,bq_load.jsonl}"
-    }
-  }
+  "buildCommand": "python build.py"
 }
