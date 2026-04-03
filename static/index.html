@@ -107,6 +107,12 @@
 
   .btn-primary:hover:not(:disabled) { background: #6d28d9; }
 
+  .btn-secondary {
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); }
+
   .btn-start {
     background: var(--accept); color: white; width: 100%;
     font-size: 18px; padding: 16px;
@@ -343,6 +349,27 @@
 
   .btn-copy:hover { border-color: var(--accent); color: var(--text); }
 
+  .credential-stack {
+    display: flex; flex-direction: column; gap: 8px; width: 100%;
+  }
+
+  .credential-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+
+  .credential-label {
+    min-width: 90px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  .resume-actions {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;
+  }
+
+  .resume-actions .btn {
+    flex: 1;
+    min-width: 220px;
+  }
+
   .api-section { margin-bottom: 24px; }
   .api-section h3 { font-size: 14px; color: var(--accent); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
@@ -381,6 +408,14 @@
 <div class="container">
   <!-- ════════════ LOBBY SCREEN ════════════ -->
   <div id="screen-lobby" class="screen active">
+    <div class="card" id="resume-card" style="display:none">
+      <h2>Resume Run</h2>
+      <div class="help-text" id="resume-copy">You have an active run saved in this browser.</div>
+      <div class="resume-actions">
+        <button class="btn btn-primary" onclick="resumeSavedRun()">Resume Active Run</button>
+        <button class="btn btn-secondary" onclick="discardSavedRun()">Start New Run Instead</button>
+      </div>
+    </div>
 
     <div class="card" id="join-card">
       <h2>Start a Run</h2>
@@ -411,10 +446,19 @@
     </div>
 
     <div class="session-id-bar">
-      Your Session ID: <code id="session-id-display">—</code>
-      <button class="btn-copy" onclick="copySessionId()">Copy</button>
-      <span style="flex:1"></span>
-      <span id="session-mode-label" style="font-size:11px">Use this session ID in the API tab to build an agent that plays for you</span>
+      <div class="credential-stack">
+        <div class="credential-row">
+          <span class="credential-label">Session ID</span>
+          <code id="session-id-display">—</code>
+          <button id="copy-session-btn" class="btn-copy" onclick="copySessionId()">Copy</button>
+        </div>
+        <div class="credential-row">
+          <span class="credential-label">Agent Token</span>
+          <code id="agent-token-display">hidden</code>
+          <button id="copy-token-btn" class="btn-copy" onclick="copyAgentToken()">Copy Token</button>
+        </div>
+        <span id="session-mode-label" style="font-size:11px">Use your session ID and agent token in the API tab to build an agent that plays for you</span>
+      </div>
     </div>
 
     <div class="nav-tabs">
@@ -466,8 +510,8 @@
       <div class="card">
         <h2>API Documentation</h2>
         <p style="color:var(--muted);margin-bottom:16px;font-size:14px;">
-          Build an agent that plays <strong>as you</strong>. Your agent uses your session ID
-          (shown above) so decisions count toward <em>your</em> score on the Hall of Fame.
+          Build an agent that plays <strong>as you</strong>. Your agent needs your session ID
+          and agent token so its decisions count toward <em>your</em> score on the Hall of Fame.
           Base URL: <code id="api-base-url" style="color:var(--accent)">http://localhost:8888</code>
         </p>
 
@@ -477,9 +521,9 @@
             <p style="margin-bottom:10px;color:var(--text)">Start a run through the UI, then hand your session ID to your agent and let it play for you.</p>
             <ol>
               <li><strong>Start your run</strong> — enter your name in the lobby</li>
-              <li><strong>Copy your session ID</strong> from the bar above</li>
+              <li><strong>Copy your session ID and agent token</strong> from the bar above</li>
               <li><strong>Give it to your agent</strong> — it calls the API using your session</li>
-              <li>Agent loop: <code>GET /api/session/{your_id}/next</code> → download files → analyze → <code>POST /api/session/{your_id}/decide</code></li>
+              <li>Agent loop: send <code>X-Session-Token</code> on <code>GET /api/session/{your_id}/next</code> → download files → analyze → <code>POST /api/session/{your_id}/decide</code></li>
               <li>Your score updates on the Hall of Fame in real time</li>
             </ol>
           </div>
@@ -489,7 +533,7 @@
           <h3>Agent Loop Endpoints</h3>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span>/next</div>
-            <div class="api-desc">Get the next customer and download URLs for the 3 files.</div>
+            <div class="api-desc">Get the next customer and download URLs for the 3 files. Requires <code>X-Session-Token</code> or <code>Authorization: Bearer ...</code>.</div>
             <div class="api-example"># Response:
 {
   "customer_id": "CUST-0042",
@@ -503,7 +547,7 @@
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-post">POST</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span>/decide</div>
-            <div class="api-desc">Submit your decision. Body: <code>{"customer_id": "CUST-0042", "decision": "ACCEPT"}</code></div>
+            <div class="api-desc">Submit your decision. Requires <code>X-Session-Token</code>. Body: <code>{"customer_id": "CUST-0042", "decision": "ACCEPT"}</code></div>
             <div class="api-desc">Decision must be <code>"ACCEPT"</code> or <code>"DENY"</code>.</div>
             <div class="api-desc">Returns: <code>{"correct": true, "explanation": "Rule 2: ..."}</code></div>
           </div>
@@ -529,7 +573,7 @@
           <h3>Helper Endpoints</h3>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span></div>
-            <div class="api-desc">Check your current score, accuracy, and avg time.</div>
+            <div class="api-desc">Check your current score, accuracy, and avg time. Requires <code>X-Session-Token</code>.</div>
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/rules</div>
@@ -548,14 +592,15 @@
         <div class="api-section">
           <h3>Example — Full Agent Loop</h3>
           <p style="color:var(--muted);font-size:13px;margin-bottom:10px">
-            Copy your session ID from above and paste it as <code>SID</code> below.
+            Copy your session ID and agent token from above and paste them below.
           </p>
           <div class="api-example">BASE="http://localhost:8888"
 SID="<span style="color:#7c3aed">paste-your-session-id-here</span>"
+TOKEN="<span style="color:#7c3aed">paste-your-agent-token-here</span>"
 
 # Loop: get customer → download files → decide
 while true; do
-  NEXT=$(curl -s $BASE/api/session/$SID/next)
+  NEXT=$(curl -s -H "X-Session-Token: $TOKEN" $BASE/api/session/$SID/next)
   CID=$(echo $NEXT | jq -r .customer_id)
 
   # Download the 3 files
@@ -573,6 +618,7 @@ while true; do
 
   curl -s -X POST $BASE/api/session/$SID/decide \
     -H "Content-Type: application/json" \
+    -H "X-Session-Token: $TOKEN" \
     -d "{\"customer_id\":\"$CID\",\"decision\":\"$DECISION\"}"
 done</div>
         </div>
@@ -604,13 +650,16 @@ done</div>
 
 <script>
 const API = '';
+const SESSION_STORAGE_KEY = 'return_desk_active_session';
 let sessionId = null;
+let sessionToken = null;
 let currentCustomer = null;
 let streak = 0;
 let leaderboardInterval = null;
 let countdownInterval = null;
 let submitting = false;
 let currentScreen = 'lobby';
+let savedSession = null;
 
 // ── Init ──
 
@@ -619,6 +668,7 @@ async function init() {
   const rulesData = await rulesRes.json();
   document.getElementById('rules-display').textContent = rulesData.rules;
   document.getElementById('api-base-url').textContent = window.location.origin;
+  await loadSavedSession();
   refreshLobbyHallOfFame();
   setInterval(refreshLobbyHallOfFame, 15000);
 }
@@ -634,9 +684,131 @@ async function readError(res) {
 
 async function fetchSession() {
   if (!sessionId) return null;
-  const res = await fetch(`${API}/api/session/${sessionId}`);
-  if (!res.ok) return null;
+  const res = await fetch(`${API}/api/session/${sessionId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      handleInvalidSessionAccess();
+    }
+    return null;
+  }
   return await res.json();
+}
+
+function authHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (sessionToken) {
+    headers['X-Session-Token'] = sessionToken;
+  }
+  return headers;
+}
+
+function copyToClipboard(value, buttonId, successText = 'Copied!') {
+  if (!value) return;
+  navigator.clipboard.writeText(value).then(() => {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+    const previous = btn.textContent;
+    btn.textContent = successText;
+    setTimeout(() => {
+      btn.textContent = previous;
+    }, 1500);
+  });
+}
+
+function maskToken(token) {
+  if (!token) return 'hidden';
+  if (token.length <= 12) return token;
+  return `${token.slice(0, 6)}...${token.slice(-4)}`;
+}
+
+function persistSession() {
+  if (!sessionId || !sessionToken) return;
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+    session_id: sessionId,
+    session_token: sessionToken,
+  }));
+}
+
+function hideResumeCard() {
+  const card = document.getElementById('resume-card');
+  if (card) {
+    card.style.display = 'none';
+  }
+}
+
+function clearPersistedSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  savedSession = null;
+  hideResumeCard();
+}
+
+async function loadSavedSession() {
+  const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.session_id || !parsed.session_token) {
+      clearPersistedSession();
+      return;
+    }
+
+    const res = await fetch(`${API}/api/session/${parsed.session_id}`, {
+      headers: { 'X-Session-Token': parsed.session_token },
+    });
+    if (!res.ok) {
+      clearPersistedSession();
+      return;
+    }
+
+    const data = await res.json();
+    if (data.state === 'ended') {
+      clearPersistedSession();
+      return;
+    }
+
+    savedSession = {
+      sessionId: parsed.session_id,
+      sessionToken: parsed.session_token,
+      summary: data,
+    };
+
+    document.getElementById('resume-copy').textContent =
+      `Resume ${data.name}'s active run with ${data.correct}/${data.total} correct and ${data.remaining_minutes} minutes left.`;
+    document.getElementById('resume-card').style.display = 'block';
+  } catch (e) {
+    clearPersistedSession();
+  }
+}
+
+function resumeSavedRun() {
+  if (!savedSession) return;
+  sessionId = savedSession.sessionId;
+  sessionToken = savedSession.sessionToken;
+  streak = 0;
+  updateStreak();
+  switchToGame();
+}
+
+function discardSavedRun() {
+  sessionId = null;
+  sessionToken = null;
+  clearPersistedSession();
+}
+
+function handleInvalidSessionAccess() {
+  if (!sessionId && !sessionToken) return;
+  sessionId = null;
+  sessionToken = null;
+  currentCustomer = null;
+  clearPersistedSession();
+  clearInterval(leaderboardInterval);
+  clearInterval(countdownInterval);
+  switchScreen('lobby');
+  document.getElementById('customer-area').innerHTML = '';
+  alert('This run is no longer accessible from this browser. Start a new run to continue.');
 }
 
 // ── Screen switching ──
@@ -649,7 +821,7 @@ function switchScreen(name) {
 
 function updateSessionModeLabel() {
   const label = document.getElementById('session-mode-label');
-  label.textContent = 'Solo run • Use this session ID in the API tab to build an agent that plays for you';
+  label.textContent = 'Solo run • Share your agent token only with agents you trust to act on this run';
 }
 
 function switchToGame() {
@@ -657,7 +829,9 @@ function switchToGame() {
   document.getElementById('game-rules-display').textContent =
     document.getElementById('rules-display').textContent;
   document.getElementById('session-id-display').textContent = sessionId;
+  document.getElementById('agent-token-display').textContent = maskToken(sessionToken);
   updateSessionModeLabel();
+  hideResumeCard();
 
   clearInterval(leaderboardInterval);
   clearInterval(countdownInterval);
@@ -671,18 +845,18 @@ function switchToGame() {
 }
 
 function copySessionId() {
-  if (!sessionId) return;
-  navigator.clipboard.writeText(sessionId).then(() => {
-    const btn = document.querySelector('.btn-copy');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 1500);
-  });
+  copyToClipboard(sessionId, 'copy-session-btn');
+}
+
+function copyAgentToken() {
+  copyToClipboard(sessionToken, 'copy-token-btn');
 }
 
 async function switchToEnded() {
   if (currentScreen === 'ended') return;
 
   switchScreen('ended');
+  clearPersistedSession();
   clearInterval(leaderboardInterval);
   clearInterval(countdownInterval);
   currentCustomer = null;
@@ -745,6 +919,10 @@ async function joinLobby() {
 
   const data = await res.json();
   sessionId = data.session_id;
+  sessionToken = data.agent_token;
+  persistSession();
+  hideResumeCard();
+  savedSession = null;
   streak = 0;
   updateStreak();
   switchToGame();
@@ -774,8 +952,14 @@ async function updateCountdown() {
 
 async function loadNextCustomer() {
   try {
-    const res = await fetch(`${API}/api/session/${sessionId}/next`);
+    const res = await fetch(`${API}/api/session/${sessionId}/next`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) {
+      if (res.status === 401) {
+        handleInvalidSessionAccess();
+        return;
+      }
       const err = await readError(res);
       if (err.error === 'session_ended') {
         switchToEnded();
@@ -819,11 +1003,15 @@ async function submitDecision(decision) {
   try {
     const res = await fetch(`${API}/api/session/${sessionId}/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ customer_id: currentCustomer.customer_id, decision }),
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        handleInvalidSessionAccess();
+        return;
+      }
       const err = await readError(res);
       if (err.error === 'session_ended') {
         switchToEnded();

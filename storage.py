@@ -50,21 +50,6 @@ class SessionStore(ABC):
     def reset(self) -> None:
         raise NotImplementedError
 
-    def find_active_session(
-        self,
-        *,
-        name: str,
-        mode: GameMode,
-        challenge_code: str | None,
-    ) -> Session | None:
-        for session in self.list_sessions(mode=mode, challenge_code=challenge_code):
-            if session.name.lower() != name.lower():
-                continue
-            if session.state == "ended":
-                continue
-            return session
-        return None
-
 
 class JsonFileSessionStore(SessionStore):
     def __init__(self, file_path: Path):

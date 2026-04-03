@@ -73,6 +73,7 @@ class Session(BaseModel):
     name: str
     mode: GameMode = GameMode.SINGLE_PLAYER
     challenge_code: Optional[str] = None
+    agent_token_hash: Optional[str] = None
     created_at: float = Field(default_factory=time.time)
     duration_minutes: int = 20
     started_at: Optional[float] = None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import secrets
 import socket
@@ -8,7 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
@@ -59,6 +60,33 @@ def get_local_ip() -> str:
 
 def error_response(status_code: int, error: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"error": error, "message": message})
+
+
+def hash_agent_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_agent_token() -> tuple[str, str]:
+    token = secrets.token_urlsafe(24)
+    return token, hash_agent_token(token)
+
+
+def extract_agent_token(request: Request) -> str | None:
+    bearer = request.headers.get("authorization", "")
+    if bearer.lower().startswith("bearer "):
+        token = bearer[7:].strip()
+        if token:
+            return token
+
+    token = request.headers.get("x-session-token", "").strip()
+    return token or None
+
+
+def require_session_access(session: Session, request: Request) -> None:
+    token = extract_agent_token(request)
+    token_hash = session.agent_token_hash or ""
+    if not token or not token_hash or not secrets.compare_digest(hash_agent_token(token), token_hash):
+        raise HTTPException(status_code=401, detail="Invalid or missing session token")
 
 
 def build_customer_lookup(items: list[Customer]) -> dict[str, Customer]:
@@ -171,21 +199,15 @@ async def get_status():
         "customer_count": len(customers),
         "duration_minutes": SESSION_DURATION_MINUTES,
         "session_count": len(sessions),
-        "players": [
-            {
-                "name": session.name,
-                "session_id": session.id,
-                "state": get_session_state(session),
-            }
-            for session in sessions
-        ],
+        "active_sessions": sum(1 for session in sessions if get_session_state(session) != "ended"),
     }
 
 
 @app.get("/api/time")
-async def get_time(session_id: str | None = None):
+async def get_time(request: Request, session_id: str | None = None):
     if session_id:
         session = get_session_or_404(session_id)
+        require_session_access(session, request)
         return session_summary(session)
 
     return {
@@ -218,24 +240,14 @@ async def create_session(req: SessionCreate):
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
 
-    existing = session_store.find_active_session(
-        name=name,
-        mode=GameMode.SINGLE_PLAYER,
-        challenge_code=None,
-    )
-    if existing:
-        return {
-            "session_id": existing.id,
-            "name": existing.name,
-            "rejoined": True,
-        }
-
     session_id = str(uuid.uuid4())[:8]
+    agent_token, agent_token_hash = create_agent_token()
     session = Session(
         id=session_id,
         name=name,
         mode=GameMode.SINGLE_PLAYER,
         challenge_code=None,
+        agent_token_hash=agent_token_hash,
         duration_minutes=SESSION_DURATION_MINUTES,
     )
     session_store.save_session(session)
@@ -244,19 +256,22 @@ async def create_session(req: SessionCreate):
     return {
         "session_id": session.id,
         "name": session.name,
-        "rejoined": False,
+        "agent_token": agent_token,
     }
 
 
 @app.get("/api/session/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, request: Request):
     session = get_session_or_404(session_id)
+    require_session_access(session, request)
     return session_summary(session)
 
 
 @app.get("/api/session/{session_id}/next")
-async def get_next_customer(session_id: str):
+async def get_next_customer(session_id: str, request: Request):
     now = time.time()
+    session = get_session_or_404(session_id)
+    require_session_access(session, request)
     session = session_store.update_session(
         session_id,
         lambda existing: _touch_current_customer(existing, now),
@@ -318,9 +333,12 @@ async def get_fraud_report(customer_id: str):
 
 
 @app.post("/api/session/{session_id}/decide")
-async def submit_decision(session_id: str, req: DecisionRequest):
+async def submit_decision(session_id: str, req: DecisionRequest, request: Request):
     now = time.time()
     response_payload: dict[str, Any] = {}
+
+    session = get_session_or_404(session_id)
+    require_session_access(session, request)
 
     def apply_decision(existing: Session) -> Session | None:
         nonlocal response_payload

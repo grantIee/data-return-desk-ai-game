@@ -15,6 +15,7 @@ Open `http://localhost:8888` to play.
 
 - Every run is a timed solo run.
 - All completed solo runs feed a persistent Hall of Fame leaderboard.
+- Each run also gets its own secret `agent token` so only the owning browser or trusted agents can act on that session.
 
 Each session gets its own timer. The 20-minute clock starts when that session loads its first customer, not when the server starts.
 
@@ -52,13 +53,13 @@ Both speed and accuracy matter.
 ## API
 
 ```text
-POST /api/session              - Create or rejoin a session
+POST /api/session              - Create a session and return { session_id, agent_token }
 GET  /api/session/{id}         - Session stats, mode, state, time remaining
 GET  /api/session/{id}/next    - Get next customer + file URLs
 POST /api/session/{id}/decide  - Submit { "customer_id": "...", "decision": "ACCEPT"|"DENY" }
 GET  /api/leaderboard          - Hall of Fame rankings for solo runs
 GET  /api/rules                - Decision rules text
-GET  /api/status               - App defaults and current sessions
+GET  /api/status               - App defaults and aggregate session counts
 POST /api/admin/reset          - Reset sessions; optionally regenerate customers
 ```
 
@@ -68,6 +69,40 @@ Session creation accepts:
 {
   "name": "Grant"
 }
+```
+
+Example response:
+
+```json
+{
+  "session_id": "7f4afdfe",
+  "name": "Grant",
+  "agent_token": "paste-this-into-your-agent"
+}
+```
+
+Every session-specific API request must include either:
+
+```text
+X-Session-Token: <agent_token>
+```
+
+or:
+
+```text
+Authorization: Bearer <agent_token>
+```
+
+Example:
+
+```bash
+BASE="http://localhost:8888"
+SID="7f4afdfe"
+TOKEN="paste-this-into-your-agent"
+
+curl -s \
+  -H "X-Session-Token: $TOKEN" \
+  "$BASE/api/session/$SID/next"
 ```
 
 ## Data Loading
@@ -91,8 +126,10 @@ Session updates are atomic through the storage layer so browser + bot traffic do
 1. Create an Upstash Redis database from the Vercel Marketplace, or otherwise provide the Redis REST URL/token env vars above.
 2. Optionally set `ADMIN_CODE`, `CUSTOMER_COUNT`, `GAME_DURATION`, and `SESSION_STORE_NAMESPACE`.
 3. Deploy the repo to Vercel. The build script will generate customer files if they are not already present.
+4. For the long-term setup, keep preview deployments protected in Vercel, but let the production game URL be public. Session access is protected in-app by per-run agent tokens instead of Vercel Authentication.
 
 Notes:
 
 - This app still serves game files from the Python function bundle. The current generated corpus is small enough for that, but if you grow the asset set significantly you should move those files to Blob or object storage.
 - Local persistence is only meant for development. Shared production state should use Redis on Vercel.
+- Anyone with a session's `agent token` can act on that run, so treat it like a credential and only share it with agents you trust.
