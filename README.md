@@ -11,11 +11,10 @@ uvicorn server:app --host 0.0.0.0 --port 8888
 
 Open `http://localhost:8888` to play.
 
-## Modes
+## Mode
 
-- `Single Player` starts a private run immediately.
-- Solo runs also feed a persistent Hall of Fame leaderboard.
-- `Async Multiplayer` puts you into a named challenge. Anyone using the same `challenge code` shares the same leaderboard, even if they play at different times.
+- Every run is a timed solo run.
+- All completed solo runs feed a persistent Hall of Fame leaderboard.
 
 Each session gets its own timer. The 20-minute clock starts when that session loads its first customer, not when the server starts.
 
@@ -57,7 +56,7 @@ POST /api/session              - Create or rejoin a session
 GET  /api/session/{id}         - Session stats, mode, state, time remaining
 GET  /api/session/{id}/next    - Get next customer + file URLs
 POST /api/session/{id}/decide  - Submit { "customer_id": "...", "decision": "ACCEPT"|"DENY" }
-GET  /api/leaderboard          - Rankings, optionally filtered by mode/challenge
+GET  /api/leaderboard          - Hall of Fame rankings for solo runs
 GET  /api/rules                - Decision rules text
 GET  /api/status               - App defaults and current sessions
 POST /api/admin/reset          - Reset sessions; optionally regenerate customers
@@ -67,18 +66,7 @@ Session creation accepts:
 
 ```json
 {
-  "name": "Grant",
-  "mode": "multiplayer",
-  "challenge_code": "friends-night"
-}
-```
-
-For single-player:
-
-```json
-{
-  "name": "Grant",
-  "mode": "single"
+  "name": "Grant"
 }
 ```
 

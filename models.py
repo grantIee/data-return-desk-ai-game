@@ -59,8 +59,6 @@ class DecisionResponse(BaseModel):
 
 class SessionCreate(BaseModel):
     name: str
-    mode: GameMode = GameMode.MULTI_PLAYER
-    challenge_code: Optional[str] = None
 
 
 class SessionDecision(BaseModel):
@@ -73,7 +71,7 @@ class SessionDecision(BaseModel):
 class Session(BaseModel):
     id: str
     name: str
-    mode: GameMode = GameMode.MULTI_PLAYER
+    mode: GameMode = GameMode.SINGLE_PLAYER
     challenge_code: Optional[str] = None
     created_at: float = Field(default_factory=time.time)
     duration_minutes: int = 20

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import secrets
 import socket
 import time
@@ -29,7 +28,6 @@ from storage import SessionStore, create_session_store
 # ── Configuration ──
 DEFAULT_CUSTOMER_COUNT = int(os.environ.get("CUSTOMER_COUNT", "500"))
 SESSION_DURATION_MINUTES = int(os.environ.get("GAME_DURATION", "20"))
-DEFAULT_CHALLENGE_CODE = os.environ.get("DEFAULT_CHALLENGE_CODE", "main")
 ADMIN_CODE = os.environ.get("ADMIN_CODE")
 
 app = FastAPI(title="The Return Desk")
@@ -57,12 +55,6 @@ def get_local_ip() -> str:
         return ip
     except Exception:
         return "127.0.0.1"
-
-
-def normalize_challenge_code(value: str | None) -> str:
-    raw = (value or "").strip().lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")
-    return slug or DEFAULT_CHALLENGE_CODE
 
 
 def error_response(status_code: int, error: str, message: str) -> JSONResponse:
@@ -154,7 +146,6 @@ async def startup():
     print("=" * 50)
     print(f"Loaded {len(customers)} customers ({accept} ACCEPT, {deny} DENY)")
     print(f"Session duration: {SESSION_DURATION_MINUTES} minutes")
-    print(f"Default challenge: {DEFAULT_CHALLENGE_CODE}")
     print(f"Session store: {session_store.backend_name}")
     print(f"Admin code: {admin_code}")
     print(f"Local: http://localhost:8888")
@@ -175,24 +166,15 @@ async def index():
 @app.get("/api/status")
 async def get_status():
     sessions = session_store.list_sessions()
-    challenge_count = len({
-        session.challenge_code
-        for session in sessions
-        if session.mode == GameMode.MULTI_PLAYER and session.challenge_code
-    })
     return {
         "storage": session_store.backend_name,
         "customer_count": len(customers),
         "duration_minutes": SESSION_DURATION_MINUTES,
-        "default_challenge_code": DEFAULT_CHALLENGE_CODE,
         "session_count": len(sessions),
-        "challenge_count": challenge_count,
         "players": [
             {
                 "name": session.name,
                 "session_id": session.id,
-                "mode": session.mode.value,
-                "challenge_code": session.challenge_code,
                 "state": get_session_state(session),
             }
             for session in sessions
@@ -236,21 +218,15 @@ async def create_session(req: SessionCreate):
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
 
-    challenge_code = None
-    if req.mode == GameMode.MULTI_PLAYER:
-        challenge_code = normalize_challenge_code(req.challenge_code)
-
     existing = session_store.find_active_session(
         name=name,
-        mode=req.mode,
-        challenge_code=challenge_code,
+        mode=GameMode.SINGLE_PLAYER,
+        challenge_code=None,
     )
     if existing:
         return {
             "session_id": existing.id,
             "name": existing.name,
-            "mode": existing.mode.value,
-            "challenge_code": existing.challenge_code,
             "rejoined": True,
         }
 
@@ -258,21 +234,16 @@ async def create_session(req: SessionCreate):
     session = Session(
         id=session_id,
         name=name,
-        mode=req.mode,
-        challenge_code=challenge_code,
+        mode=GameMode.SINGLE_PLAYER,
+        challenge_code=None,
         duration_minutes=SESSION_DURATION_MINUTES,
     )
     session_store.save_session(session)
 
-    print(
-        f"  -> Session created: {session.name} ({session.id}) "
-        f"[{session.mode.value}{f'/{session.challenge_code}' if session.challenge_code else ''}]"
-    )
+    print(f"  -> Session created: {session.name} ({session.id}) [single]")
     return {
         "session_id": session.id,
         "name": session.name,
-        "mode": session.mode.value,
-        "challenge_code": session.challenge_code,
         "rejoined": False,
     }
 
@@ -413,13 +384,9 @@ async def submit_decision(session_id: str, req: DecisionRequest):
 
 
 @app.get("/api/leaderboard")
-async def get_leaderboard(challenge_code: str | None = None, mode: GameMode | None = None):
-    normalized_challenge = None
-    if challenge_code is not None:
-        normalized_challenge = normalize_challenge_code(challenge_code)
-
+async def get_leaderboard():
     entries = []
-    for session in session_store.list_sessions(mode=mode, challenge_code=normalized_challenge):
+    for session in session_store.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None):
         if session.total_count == 0:
             continue
 
@@ -427,8 +394,6 @@ async def get_leaderboard(challenge_code: str | None = None, mode: GameMode | No
             {
                 "session_id": session.id,
                 "name": session.name,
-                "mode": session.mode.value,
-                "challenge_code": session.challenge_code,
                 "state": get_session_state(session),
                 "correct": session.correct_count,
                 "total": session.total_count,
