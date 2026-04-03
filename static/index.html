@@ -371,37 +371,52 @@
   .run-metric-value { font-size: 24px; font-weight: 700; }
 
   .run-chart {
-    display: flex; align-items: flex-end; gap: 10px; overflow-x: auto;
-    padding: 8px 0 4px; margin-bottom: 18px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; margin-bottom: 18px;
   }
 
-  .run-bar-column {
-    min-width: 36px; flex: 1 0 36px;
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  .run-chart-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    color: var(--muted); font-size: 12px; margin-bottom: 12px;
   }
 
-  .run-bar-label {
-    font-size: 11px; color: var(--muted); white-space: nowrap;
+  .run-chart-legend-item {
+    display: inline-flex; align-items: center; gap: 8px;
   }
 
-  .run-bar {
-    width: 100%; max-width: 44px; min-height: 24px;
-    border-radius: 10px 10px 4px 4px; border: 1px solid transparent;
+  .run-chart-legend-line {
+    width: 22px; height: 0; border-top: 2px solid var(--accent);
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
   }
 
-  .run-bar.correct {
-    background: linear-gradient(180deg, #22c55e, #166534);
-    border-color: rgba(34, 197, 94, 0.35);
+  .run-chart-legend-dot {
+    width: 10px; height: 10px; border-radius: 999px; display: inline-block;
   }
 
-  .run-bar.incorrect {
-    background: linear-gradient(180deg, #ef4444, #991b1b);
-    border-color: rgba(239, 68, 68, 0.35);
+  .run-chart-legend-dot.correct { background: var(--correct); }
+  .run-chart-legend-dot.incorrect { background: var(--incorrect); }
+
+  .run-chart-grid {
+    display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px;
+    align-items: stretch;
   }
 
-  .run-bar-caption {
-    font-size: 11px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.8px;
+  .run-chart-y-axis {
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 6px 0 26px; color: var(--muted); font-size: 11px;
+  }
+
+  .run-chart-stage {
+    min-width: 0;
+  }
+
+  .run-chart-svg {
+    width: 100%; height: 220px; display: block;
+  }
+
+  .run-chart-x-axis {
+    display: flex; justify-content: space-between;
+    color: var(--muted); font-size: 11px; margin-top: 8px;
   }
 
   .run-insights {
@@ -517,9 +532,10 @@
     .decision-buttons { grid-template-columns: 1fr; }
     .stat-bar { gap: 12px; }
     header h1 { font-size: 18px; }
-    .run-chart { gap: 8px; }
-    .run-bar-column { min-width: 32px; }
     .run-breakdown { padding: 18px; }
+    .run-chart { padding: 12px; }
+    .run-chart-grid { grid-template-columns: 34px minmax(0, 1fr); gap: 8px; }
+    .run-chart-svg { height: 180px; }
     .modal-overlay { padding: 12px; }
     .modal-card { padding: 18px; max-height: calc(100vh - 24px); }
     .modal-header { flex-direction: column; }
@@ -1119,14 +1135,103 @@ function buildRunInsights(stats, history) {
   return insights.slice(0, 3);
 }
 
+function buildAccuracyLineChart(history) {
+  const viewWidth = 640;
+  const viewHeight = 220;
+  const chartLeft = 18;
+  const chartRight = 622;
+  const chartTop = 14;
+  const chartBottom = 188;
+  const chartWidth = chartRight - chartLeft;
+  const chartHeight = chartBottom - chartTop;
+  const xForIndex = (index) => (
+    history.length === 1
+      ? chartLeft + chartWidth / 2
+      : chartLeft + (index / (history.length - 1)) * chartWidth
+  );
+  const yForAccuracy = (accuracy) => chartBottom - (accuracy / 100) * chartHeight;
+
+  const points = history.map((item, index) => ({
+    x: xForIndex(index),
+    y: yForAccuracy(item.cumulative_accuracy),
+    item,
+  }));
+
+  const polylinePoints = points
+    .map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+    .join(' ');
+  const areaPoints = [
+    `${points[0].x.toFixed(1)},${chartBottom}`,
+    polylinePoints,
+    `${points[points.length - 1].x.toFixed(1)},${chartBottom}`,
+  ].join(' ');
+
+  const gridLines = [0, 25, 50, 75, 100]
+    .map(value => {
+      const y = yForAccuracy(value);
+      return `<line x1="${chartLeft}" y1="${y}" x2="${chartRight}" y2="${y}" stroke="rgba(136,136,160,0.18)" stroke-width="1" />`;
+    })
+    .join('');
+
+  const pointMarkers = points
+    .map(point => `
+      <circle
+        cx="${point.x.toFixed(1)}"
+        cy="${point.y.toFixed(1)}"
+        r="4.5"
+        fill="${point.item.correct ? '#22c55e' : '#ef4444'}"
+        stroke="#0a0a0f"
+        stroke-width="2"
+      >
+        <title>Turn ${point.item.number}: ${point.item.cumulative_accuracy}% accuracy, ${point.item.correct ? 'correct' : 'incorrect'}, ${formatSeconds(point.item.time_taken)}</title>
+      </circle>
+    `)
+    .join('');
+
+  return `
+    <div class="run-chart">
+      <div class="run-chart-legend">
+        <span class="run-chart-legend-item"><span class="run-chart-legend-line"></span>Cumulative accuracy</span>
+        <span class="run-chart-legend-item"><span class="run-chart-legend-dot correct"></span>Correct turn</span>
+        <span class="run-chart-legend-item"><span class="run-chart-legend-dot incorrect"></span>Incorrect turn</span>
+      </div>
+      <div class="run-chart-grid">
+        <div class="run-chart-y-axis">
+          <span>100%</span>
+          <span>50%</span>
+          <span>0%</span>
+        </div>
+        <div class="run-chart-stage">
+          <svg class="run-chart-svg" viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" role="img" aria-label="Cumulative accuracy over the run">
+            ${gridLines}
+            <polygon points="${areaPoints}" fill="#7c3aed" fill-opacity="0.12"></polygon>
+            <polyline
+              points="${polylinePoints}"
+              fill="none"
+              stroke="#7c3aed"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></polyline>
+            ${pointMarkers}
+          </svg>
+          <div class="run-chart-x-axis">
+            <span>Turn 1</span>
+            <span>Turn ${history[history.length - 1].number}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderRunBreakdown(stats, options = {}) {
   const title = options.title || 'Run Breakdown';
-  const subtitle = options.subtitle || 'Green turns were correct. Taller bars took longer.';
+  const subtitle = options.subtitle || 'Line shows cumulative accuracy. Point color shows whether each turn was right or wrong.';
   const includeNote = options.includeNote !== false;
   const history = Array.isArray(stats.decision_history) ? stats.decision_history : [];
   if (!history.length) return '';
 
-  const maxTime = Math.max(...history.map(item => item.time_taken), 0.1);
   const splitIndex = Math.max(1, Math.floor(history.length / 2));
   const openingSegment = history.slice(0, splitIndex);
   const closingSegment = history.slice(splitIndex);
@@ -1143,17 +1248,6 @@ function renderRunBreakdown(stats, options = {}) {
       paceTrend = 'Faster late';
     }
   }
-
-  const bars = history.map(item => {
-    const height = Math.max(24, Math.round((item.time_taken / maxTime) * 140));
-    return `
-      <div class="run-bar-column" title="Turn ${item.number}: ${item.correct ? 'Correct' : 'Incorrect'} in ${formatSeconds(item.time_taken)}">
-        <div class="run-bar-label">${formatSeconds(item.time_taken)}</div>
-        <div class="run-bar ${item.correct ? 'correct' : 'incorrect'}" style="height:${height}px"></div>
-        <div class="run-bar-caption">#${item.number}</div>
-      </div>
-    `;
-  }).join('');
 
   const insights = buildRunInsights(stats, history)
     .map(text => `<div class="run-insight">${text}</div>`)
@@ -1187,7 +1281,7 @@ function renderRunBreakdown(stats, options = {}) {
           <div class="run-metric-value">${paceTrend}</div>
         </div>
       </div>
-      <div class="run-chart">${bars}</div>
+      ${buildAccuracyLineChart(history)}
       <div class="run-insights">${insights}</div>
       ${includeNote ? `
       <div class="run-note">
