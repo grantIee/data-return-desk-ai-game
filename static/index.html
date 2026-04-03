@@ -138,6 +138,16 @@
     max-height: 400px; overflow-y: auto;
   }
 
+  .briefing-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; color: var(--text); line-height: 1.7; font-size: 14px;
+  }
+
+  .briefing-box strong {
+    display: block; margin-bottom: 6px; color: var(--accent);
+    font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  }
+
   .countdown-bar {
     text-align: center; padding: 10px 16px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;
@@ -597,6 +607,11 @@
     </div>
 
     <div class="card">
+      <h2>Briefing</h2>
+      <div class="briefing-box" id="briefing-display">Loading briefing...</div>
+    </div>
+
+    <div class="card">
       <h2>Decision Rules</h2>
       <div class="rules-box" id="rules-display">Loading rules...</div>
     </div>
@@ -674,6 +689,7 @@
 
     <!-- Rules Tab -->
     <div id="tab-rules" class="game-tab" style="display:none">
+      <div class="card"><h2>Briefing</h2><div class="briefing-box" id="game-briefing-display"></div></div>
       <div class="card"><h2>Decision Rules</h2><div class="rules-box" id="game-rules-display"></div></div>
     </div>
 
@@ -857,11 +873,27 @@ let runChartCounter = 0;
 async function init() {
   const rulesRes = await fetch(`${API}/api/rules`);
   const rulesData = await rulesRes.json();
+  document.getElementById('briefing-display').innerHTML = formatBriefing(rulesData.briefing || '');
+  document.getElementById('game-briefing-display').innerHTML = formatBriefing(rulesData.briefing || '');
   document.getElementById('rules-display').textContent = rulesData.rules;
   document.getElementById('api-base-url').textContent = window.location.origin;
   await loadSavedSession();
   refreshLobbyHallOfFame();
   setInterval(refreshLobbyHallOfFame, 15000);
+}
+
+function formatBriefing(text) {
+  const blocks = text
+    .split(/\n\s*\n/)
+    .map(block => block.trim())
+    .filter(Boolean);
+
+  return blocks.map(block => {
+    const lines = block.split('\n');
+    const heading = lines[0];
+    const body = lines.slice(1).join(' ').trim();
+    return `<div style="margin-bottom:14px"><strong>${escapeHtml(heading)}</strong>${escapeHtml(body)}</div>`;
+  }).join('');
 }
 
 async function readError(res) {
@@ -1027,6 +1059,8 @@ function updateSessionModeLabel() {
 
 function switchToGame() {
   switchScreen('game');
+  document.getElementById('game-briefing-display').innerHTML =
+    document.getElementById('briefing-display').innerHTML;
   document.getElementById('game-rules-display').textContent =
     document.getElementById('rules-display').textContent;
   document.getElementById('session-id-display').textContent = sessionId;

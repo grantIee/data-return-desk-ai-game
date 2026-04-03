@@ -23,7 +23,7 @@ from models import (
     SessionDecision,
     DecisionRequest,
 )
-from rules import RULES_TEXT, evaluate
+from rules import BRIEFING_TEXT, RULES_TEXT, evaluate
 from storage import SessionStore, create_session_store
 
 # ── Configuration ──
@@ -289,7 +289,7 @@ async def get_time(request: Request, session_id: str | None = None):
 
 @app.get("/api/rules")
 async def get_rules():
-    return {"rules": RULES_TEXT}
+    return {"briefing": BRIEFING_TEXT, "rules": RULES_TEXT}
 
 
 @app.get("/api/ip")
