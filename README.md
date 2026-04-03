@@ -33,16 +33,59 @@ Based on these files, decide `ACCEPT` or `DENY`.
 
 Evaluate in order. Stop at the first rule that triggers.
 
+Definitions:
+
+- `return_rate = returned transactions / purchase transactions`
+- `return_dollar_ratio = total return dollars / total purchase dollars`
+
+Named rules:
+
 | Rule | Condition | Decision |
 |------|-----------|----------|
 | 1 - Photo Gate | Receipt has NO customer photo | DENY |
 | 2 - Loyalty Override | Loyalty tier is `GOLD` | ACCEPT |
 | 3 - Fraud Override | Fraud = `not malicious` AND spending = `high` | ACCEPT |
-| 4 - Return Rate | Return rate > 20% | DENY |
-| 5 - Dollar Exception | Return $ < 80% of purchase $ | ACCEPT |
-| 6 - Default | None of the above | DENY |
+| 4 - Low-Dollar Accept | `return_dollar_ratio < 0.80` | ACCEPT |
+| 5 - High-Rate Deny | `return_rate > 0.20` | DENY |
+| 6 - Default Deny | None of the above | DENY |
 
-Order: Rule 1 -> Rule 2 -> Rule 3 -> Rule 4 (with Rule 5 exception) -> Rule 6
+Canonical decision order:
+
+1. If the receipt does not contain a customer photo, `DENY`.
+2. Else if the customer's loyalty tier is `GOLD`, `ACCEPT`.
+3. Else if the fraud report says `not malicious` and spending potential is `high`, `ACCEPT`.
+4. Else if `return_dollar_ratio < 0.80`, `ACCEPT`.
+5. Else if `return_rate > 0.20`, `DENY`.
+6. Else `DENY`.
+
+Notes for agent builders:
+
+- Stop at the first matching rule.
+- Rule order matters more than anything else.
+- Loyalty tier is not present in the 3 customer files. If you want Rule 2, you need a separate lookup by `customer_id`.
+
+```sql
+SELECT loyalty_tier
+FROM prod-peach-street.analytics_poc.return_desk_customers
+WHERE customer_id = '...'
+```
+
+Decision flow:
+
+```mermaid
+flowchart TD
+    A[Start] --> B{Customer photo present?}
+    B -- No --> D1[DENY]
+    B -- Yes --> C{Loyalty tier = GOLD?}
+    C -- Yes --> A1[ACCEPT]
+    C -- No --> E{Fraud report says not malicious<br/>and spending potential = high?}
+    E -- Yes --> A2[ACCEPT]
+    E -- No --> F{return_dollar_ratio < 0.80?}
+    F -- Yes --> A3[ACCEPT]
+    F -- No --> G{return_rate > 0.20?}
+    G -- Yes --> D2[DENY]
+    G -- No --> D3[DENY]
+```
 
 ## Scoring
 

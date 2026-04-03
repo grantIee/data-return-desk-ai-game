@@ -7,6 +7,10 @@ RETURN DESK DECISION RULES
 
 Evaluate customers in this exact order. Stop at the first rule that triggers.
 
+Definitions:
+  - return_rate = returned transactions / purchase transactions
+  - return_dollar_ratio = total return dollars / total purchase dollars
+
 RULE 1 — Photo Gate:
   If the receipt PDF does NOT contain the customer's photo → DENY
 
@@ -22,17 +26,22 @@ RULE 3 — Fraud Override:
   If fraud report says "not malicious" AND spending potential is "high" → ACCEPT
   (This overrides Rules 4-6)
 
-RULE 4 — Return Rate:
-  If return rate > 20% → DENY
-  (But check Rule 5 first — it's an exception)
+RULE 4 — Low-Dollar Accept:
+  If return_dollar_ratio < 0.80 → ACCEPT
 
-RULE 5 — Dollar Amount Exception (to Rule 4):
-  If total return dollar amount < 80% of total purchase amount → ACCEPT
+RULE 5 — High-Rate Deny:
+  If return_rate > 0.20 → DENY
 
-RULE 6 — Default:
+RULE 6 — Default Deny:
   If none of the above triggered → DENY
 
-Evaluation order: Rule 1 → Rule 2 → Rule 3 → Rule 4 (with Rule 5 exception) → Rule 6
+Decision order:
+  1. Photo Gate
+  2. Loyalty Override
+  3. Fraud Override
+  4. Low-Dollar Accept
+  5. High-Rate Deny
+  6. Default Deny
 """.strip()
 
 

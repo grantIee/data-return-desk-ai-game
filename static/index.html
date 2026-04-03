@@ -22,6 +22,7 @@
     --bronze: #d97706;
     --correct: #22c55e;
     --incorrect: #ef4444;
+    --speed: #38bdf8;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -370,14 +371,33 @@
 
   .run-metric-value { font-size: 24px; font-weight: 700; }
 
+  .run-charts {
+    display: grid; gap: 16px; margin-bottom: 18px;
+  }
+
   .run-chart {
     background: var(--bg); border: 1px solid var(--border);
     border-radius: 14px; padding: 16px; margin-bottom: 18px;
   }
 
+  .run-chart:last-child { margin-bottom: 0; }
+
+  .run-chart-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+
+  .run-chart-title {
+    font-size: 15px; font-weight: 700; margin: 0 0 6px 0;
+  }
+
+  .run-chart-subtitle {
+    color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0;
+  }
+
   .run-chart-legend {
     display: flex; gap: 16px; flex-wrap: wrap;
-    color: var(--muted); font-size: 12px; margin-bottom: 12px;
+    color: var(--muted); font-size: 12px;
   }
 
   .run-chart-legend-item {
@@ -407,7 +427,7 @@
   }
 
   .run-chart-stage {
-    min-width: 0;
+    min-width: 0; position: relative;
   }
 
   .run-chart-svg {
@@ -417,6 +437,31 @@
   .run-chart-x-axis {
     display: flex; justify-content: space-between;
     color: var(--muted); font-size: 11px; margin-top: 8px;
+  }
+
+  .run-chart-tooltip {
+    position: absolute; z-index: 2; min-width: 170px; max-width: 220px;
+    background: rgba(10, 10, 15, 0.96); border: 1px solid rgba(124, 58, 237, 0.45);
+    border-radius: 12px; padding: 10px 12px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+    pointer-events: none; opacity: 0; transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  .run-chart-tooltip.show {
+    opacity: 1; transform: translateY(0);
+  }
+
+  .run-chart-tooltip-title {
+    font-size: 12px; font-weight: 700; margin-bottom: 6px;
+  }
+
+  .run-chart-tooltip-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 12px; color: var(--muted); margin-top: 4px;
+  }
+
+  .run-chart-tooltip-row strong {
+    color: var(--text); font-weight: 600;
   }
 
   .run-insights {
@@ -534,8 +579,12 @@
     header h1 { font-size: 18px; }
     .run-breakdown { padding: 18px; }
     .run-chart { padding: 12px; }
+    .run-chart-header { gap: 10px; }
     .run-chart-grid { grid-template-columns: 34px minmax(0, 1fr); gap: 8px; }
     .run-chart-svg { height: 180px; }
+    .run-chart-tooltip {
+      min-width: 150px; max-width: 190px; padding: 8px 10px;
+    }
     .modal-overlay { padding: 12px; }
     .modal-card { padding: 18px; max-height: calc(100vh - 24px); }
     .modal-header { flex-direction: column; }
@@ -700,11 +749,11 @@
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/files/{customer_id}/transactions.xlsx</div>
-            <div class="api-desc">Transaction history — calculate return rate and dollar ratio (Rules 3-4). No summary row.</div>
+            <div class="api-desc">Transaction history — calculate <code>return_rate</code> and <code>return_dollar_ratio</code> for Rules 4-5. No summary row.</div>
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/files/{customer_id}/fraud_report.pptx</div>
-            <div class="api-desc">Fraud report deck — the assessment is buried on one slide among filler (Rule 2).</div>
+            <div class="api-desc">Fraud report deck — the assessment is buried on one slide among filler (Rule 3).</div>
           </div>
         </div>
 
@@ -716,7 +765,7 @@
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/rules</div>
-            <div class="api-desc">Decision rules as text — feed this to your agent so it knows the logic.</div>
+            <div class="api-desc">Decision rules as text, including metric definitions and exact evaluation order. Feed this to your agent so it knows the logic.</div>
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/leaderboard</div>
@@ -749,9 +798,10 @@ while true; do
 
   # TODO: Analyze files and determine ACCEPT or DENY
   # - receipt.pdf: is there a customer photo?
-  # - tx.xlsx: calculate return_rate and dollar_ratio
+  # - tx.xlsx: calculate return_rate and return_dollar_ratio
   # - fraud.pptx: find the assessment slide
-  # - Apply rules 1-5 in order
+  # - loyalty tier is not in the files; look it up separately if you want Rule 2
+  # - Apply rules 1-6 in order and stop at the first match
 
   DECISION="ACCEPT"  # or "DENY"
 
@@ -815,6 +865,7 @@ let leaderboardInterval = null;
 let countdownInterval = null;
 let submitting = false;
 let currentScreen = 'lobby';
+let runChartCounter = 0;
 
 // ── Init ──
 
@@ -1087,7 +1138,38 @@ function segmentAccuracy(history) {
 function formatSeconds(seconds) {
   if (seconds === null || seconds === undefined) return '—';
   const digits = seconds >= 10 ? 1 : 2;
-  return `${seconds.toFixed(digits).replace(/\.0$/, '')}s`;
+  return `${seconds.toFixed(digits).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}s`;
+}
+
+function formatPercent(value) {
+  if (value === null || value === undefined) return '—';
+  return `${Number(value).toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function nextRunChartId() {
+  runChartCounter += 1;
+  return `run-chart-${runChartCounter}`;
+}
+
+function niceCeil(value) {
+  if (value <= 1) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+
+  if (normalized <= 1) return magnitude;
+  if (normalized <= 2) return 2 * magnitude;
+  if (normalized <= 2.5) return 2.5 * magnitude;
+  if (normalized <= 5) return 5 * magnitude;
+  return 10 * magnitude;
+}
+
+function buildTickValues(min, max, steps) {
+  const ticks = [];
+  const range = max - min || 1;
+  for (let i = 0; i <= steps; i += 1) {
+    ticks.push(max - (range * i) / steps);
+  }
+  return ticks;
 }
 
 function buildRunInsights(stats, history) {
@@ -1135,7 +1217,91 @@ function buildRunInsights(stats, history) {
   return insights.slice(0, 3);
 }
 
-function buildAccuracyLineChart(history) {
+function updateRunChartHover(chartId, trigger, event) {
+  const stage = document.getElementById(`${chartId}-stage`);
+  const tooltip = document.getElementById(`${chartId}-tooltip`);
+  const guideX = document.getElementById(`${chartId}-guide-x`);
+  const guideY = document.getElementById(`${chartId}-guide-y`);
+  const activePoint = document.getElementById(`${chartId}-active-point`);
+
+  if (!stage || !tooltip || !guideX || !guideY || !activePoint) return;
+
+  const x = Number(trigger.dataset.x);
+  const y = Number(trigger.dataset.y);
+  const pointFill = trigger.dataset.pointFill || '#22c55e';
+
+  guideX.setAttribute('x1', x);
+  guideX.setAttribute('x2', x);
+  guideX.setAttribute('opacity', '1');
+  guideY.setAttribute('y1', y);
+  guideY.setAttribute('y2', y);
+  guideY.setAttribute('opacity', '1');
+  activePoint.setAttribute('cx', x);
+  activePoint.setAttribute('cy', y);
+  activePoint.setAttribute('fill', pointFill);
+  activePoint.setAttribute('opacity', '1');
+
+  tooltip.innerHTML = `
+    <div class="run-chart-tooltip-title">${escapeHtml(trigger.dataset.turnLabel || 'Turn')}</div>
+    <div class="run-chart-tooltip-row"><span>${escapeHtml(trigger.dataset.primaryLabel || 'Value')}</span><strong>${escapeHtml(trigger.dataset.primaryValue || '—')}</strong></div>
+    <div class="run-chart-tooltip-row"><span>Accuracy</span><strong>${escapeHtml(trigger.dataset.accuracyValue || '—')}</strong></div>
+    <div class="run-chart-tooltip-row"><span>Turn Time</span><strong>${escapeHtml(trigger.dataset.timeValue || '—')}</strong></div>
+    <div class="run-chart-tooltip-row"><span>Result</span><strong>${escapeHtml(trigger.dataset.correctLabel || '—')}</strong></div>
+  `;
+  tooltip.classList.add('show');
+
+  const stageRect = stage.getBoundingClientRect();
+  const localX = event.clientX - stageRect.left;
+  const localY = event.clientY - stageRect.top;
+  const tooltipWidth = tooltip.offsetWidth;
+  const tooltipHeight = tooltip.offsetHeight;
+  const maxLeft = Math.max(8, stage.clientWidth - tooltipWidth - 8);
+  let left = Math.min(maxLeft, Math.max(8, localX + 14));
+  let top = localY - tooltipHeight - 14;
+
+  if (top < 8) {
+    top = Math.min(stage.clientHeight - tooltipHeight - 8, localY + 14);
+  }
+  if (top < 8) {
+    top = 8;
+  }
+  if (left > maxLeft) {
+    left = maxLeft;
+  }
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function clearRunChartHover(chartId) {
+  const tooltip = document.getElementById(`${chartId}-tooltip`);
+  const guideX = document.getElementById(`${chartId}-guide-x`);
+  const guideY = document.getElementById(`${chartId}-guide-y`);
+  const activePoint = document.getElementById(`${chartId}-active-point`);
+
+  if (tooltip) tooltip.classList.remove('show');
+  if (guideX) guideX.setAttribute('opacity', '0');
+  if (guideY) guideY.setAttribute('opacity', '0');
+  if (activePoint) activePoint.setAttribute('opacity', '0');
+}
+
+function buildInteractiveLineChart(config) {
+  const {
+    history,
+    title,
+    subtitle,
+    lineColor,
+    fillColor,
+    valueAccessor,
+    valueFormatter,
+    yTickFormatter,
+    yMin = 0,
+    yMax,
+    ariaLabel,
+    primaryLabel,
+  } = config;
+
+  const chartId = nextRunChartId();
   const viewWidth = 640;
   const viewHeight = 220;
   const chartLeft = 18;
@@ -1144,16 +1310,18 @@ function buildAccuracyLineChart(history) {
   const chartBottom = 188;
   const chartWidth = chartRight - chartLeft;
   const chartHeight = chartBottom - chartTop;
+  const valueRange = yMax - yMin || 1;
   const xForIndex = (index) => (
     history.length === 1
       ? chartLeft + chartWidth / 2
       : chartLeft + (index / (history.length - 1)) * chartWidth
   );
-  const yForAccuracy = (accuracy) => chartBottom - (accuracy / 100) * chartHeight;
+  const yForValue = (value) => chartBottom - ((value - yMin) / valueRange) * chartHeight;
 
   const points = history.map((item, index) => ({
     x: xForIndex(index),
-    y: yForAccuracy(item.cumulative_accuracy),
+    y: yForValue(valueAccessor(item)),
+    value: valueAccessor(item),
     item,
   }));
 
@@ -1166,10 +1334,40 @@ function buildAccuracyLineChart(history) {
     `${points[points.length - 1].x.toFixed(1)},${chartBottom}`,
   ].join(' ');
 
-  const gridLines = [0, 25, 50, 75, 100]
+  const tickValues = buildTickValues(yMin, yMax, 4);
+  const gridLines = tickValues
     .map(value => {
-      const y = yForAccuracy(value);
+      const y = yForValue(value);
       return `<line x1="${chartLeft}" y1="${y}" x2="${chartRight}" y2="${y}" stroke="rgba(136,136,160,0.18)" stroke-width="1" />`;
+    })
+    .join('');
+
+  const hoverBands = points
+    .map((point, index) => {
+      const left = index === 0 ? chartLeft : (points[index - 1].x + point.x) / 2;
+      const right = index === points.length - 1 ? chartRight : (point.x + points[index + 1].x) / 2;
+      return `
+        <rect
+          x="${left.toFixed(1)}"
+          y="${chartTop}"
+          width="${Math.max(8, right - left).toFixed(1)}"
+          height="${chartHeight}"
+          fill="transparent"
+          style="cursor: crosshair"
+          data-x="${point.x.toFixed(1)}"
+          data-y="${point.y.toFixed(1)}"
+          data-turn-label="Turn ${point.item.number}"
+          data-primary-label="${escapeHtml(primaryLabel)}"
+          data-primary-value="${escapeHtml(valueFormatter(point.value))}"
+          data-accuracy-value="${escapeHtml(formatPercent(point.item.cumulative_accuracy))}"
+          data-time-value="${escapeHtml(formatSeconds(point.item.time_taken))}"
+          data-correct-label="${point.item.correct ? 'Correct' : 'Incorrect'}"
+          data-point-fill="${point.item.correct ? '#22c55e' : '#ef4444'}"
+          onmouseenter="updateRunChartHover('${chartId}', this, event)"
+          onmousemove="updateRunChartHover('${chartId}', this, event)"
+          onmouseleave="clearRunChartHover('${chartId}')"
+        ></rect>
+      `;
     })
     .join('');
 
@@ -1190,31 +1388,40 @@ function buildAccuracyLineChart(history) {
 
   return `
     <div class="run-chart">
-      <div class="run-chart-legend">
-        <span class="run-chart-legend-item"><span class="run-chart-legend-line"></span>Cumulative accuracy</span>
-        <span class="run-chart-legend-item"><span class="run-chart-legend-dot correct"></span>Correct turn</span>
-        <span class="run-chart-legend-item"><span class="run-chart-legend-dot incorrect"></span>Incorrect turn</span>
+      <div class="run-chart-header">
+        <div>
+          <h4 class="run-chart-title">${title}</h4>
+          <p class="run-chart-subtitle">${subtitle}</p>
+        </div>
+        <div class="run-chart-legend">
+          <span class="run-chart-legend-item"><span class="run-chart-legend-line" style="border-top-color:${lineColor};box-shadow:0 0 12px ${fillColor}"></span>${primaryLabel}</span>
+          <span class="run-chart-legend-item"><span class="run-chart-legend-dot correct"></span>Correct turn</span>
+          <span class="run-chart-legend-item"><span class="run-chart-legend-dot incorrect"></span>Incorrect turn</span>
+        </div>
       </div>
       <div class="run-chart-grid">
         <div class="run-chart-y-axis">
-          <span>100%</span>
-          <span>50%</span>
-          <span>0%</span>
+          ${tickValues.map(value => `<span>${yTickFormatter(value)}</span>`).join('')}
         </div>
-        <div class="run-chart-stage">
-          <svg class="run-chart-svg" viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" role="img" aria-label="Cumulative accuracy over the run">
+        <div id="${chartId}-stage" class="run-chart-stage">
+          <svg class="run-chart-svg" viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" role="img" aria-label="${ariaLabel}">
             ${gridLines}
-            <polygon points="${areaPoints}" fill="#7c3aed" fill-opacity="0.12"></polygon>
+            <polygon points="${areaPoints}" fill="${fillColor}" fill-opacity="0.14"></polygon>
             <polyline
               points="${polylinePoints}"
               fill="none"
-              stroke="#7c3aed"
+              stroke="${lineColor}"
               stroke-width="3"
               stroke-linecap="round"
               stroke-linejoin="round"
             ></polyline>
+            <line id="${chartId}-guide-x" x1="${chartLeft}" y1="${chartTop}" x2="${chartLeft}" y2="${chartBottom}" stroke="rgba(224,224,232,0.28)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"></line>
+            <line id="${chartId}-guide-y" x1="${chartLeft}" y1="${chartBottom}" x2="${chartRight}" y2="${chartBottom}" stroke="rgba(224,224,232,0.18)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"></line>
             ${pointMarkers}
+            <circle id="${chartId}-active-point" cx="${chartLeft}" cy="${chartBottom}" r="7" fill="${lineColor}" stroke="#0a0a0f" stroke-width="3" opacity="0"></circle>
+            ${hoverBands}
           </svg>
+          <div id="${chartId}-tooltip" class="run-chart-tooltip"></div>
           <div class="run-chart-x-axis">
             <span>Turn 1</span>
             <span>Turn ${history[history.length - 1].number}</span>
@@ -1227,7 +1434,7 @@ function buildAccuracyLineChart(history) {
 
 function renderRunBreakdown(stats, options = {}) {
   const title = options.title || 'Run Breakdown';
-  const subtitle = options.subtitle || 'Line shows cumulative accuracy. Point color shows whether each turn was right or wrong.';
+  const subtitle = options.subtitle || 'Hover either chart to trace a specific turn and compare accuracy against speed.';
   const includeNote = options.includeNote !== false;
   const history = Array.isArray(stats.decision_history) ? stats.decision_history : [];
   if (!history.length) return '';
@@ -1252,6 +1459,9 @@ function renderRunBreakdown(stats, options = {}) {
   const insights = buildRunInsights(stats, history)
     .map(text => `<div class="run-insight">${text}</div>`)
     .join('');
+
+  const maxTurnTime = Math.max(...history.map(item => item.time_taken), 0.1);
+  const speedChartMax = niceCeil(maxTurnTime * 1.1);
 
   return `
     <div class="run-breakdown">
@@ -1281,7 +1491,36 @@ function renderRunBreakdown(stats, options = {}) {
           <div class="run-metric-value">${paceTrend}</div>
         </div>
       </div>
-      ${buildAccuracyLineChart(history)}
+      <div class="run-charts">
+        ${buildInteractiveLineChart({
+          history,
+          title: 'Accuracy Over Run',
+          subtitle: 'Cumulative accuracy after each turn.',
+          lineColor: '#7c3aed',
+          fillColor: 'rgba(124,58,237,0.28)',
+          valueAccessor: (item) => item.cumulative_accuracy,
+          valueFormatter: (value) => formatPercent(value),
+          yTickFormatter: (value) => formatPercent(value),
+          yMin: 0,
+          yMax: 100,
+          ariaLabel: 'Cumulative accuracy over the run',
+          primaryLabel: 'Cumulative accuracy',
+        })}
+        ${buildInteractiveLineChart({
+          history,
+          title: 'Speed By Turn',
+          subtitle: 'Total decision time for each customer.',
+          lineColor: '#38bdf8',
+          fillColor: 'rgba(56,189,248,0.28)',
+          valueAccessor: (item) => item.time_taken,
+          valueFormatter: (value) => formatSeconds(value),
+          yTickFormatter: (value) => formatSeconds(value),
+          yMin: 0,
+          yMax: speedChartMax,
+          ariaLabel: 'Decision time by turn',
+          primaryLabel: 'Decision time',
+        })}
+      </div>
       <div class="run-insights">${insights}</div>
       ${includeNote ? `
       <div class="run-note">
