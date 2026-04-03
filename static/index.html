@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Return Desk</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a2e;
+    --border: #2a2a3e;
+    --text: #e0e0e8;
+    --muted: #8888a0;
+    --accent: #7c3aed;
+    --accept: #22c55e;
+    --deny: #ef4444;
+    --gold: #fbbf24;
+    --silver: #94a3b8;
+    --bronze: #d97706;
+    --correct: #22c55e;
+    --incorrect: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+  header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+
+  header h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 28px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(124,58,237,0.4);
+  }
+
+  header .subtitle { color: var(--muted); font-size: 14px; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Cards ── */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+
+  .card h2 { font-size: 18px; margin-bottom: 16px; }
+
+  /* ── Inputs & Buttons ── */
+
+  .input-group { margin-bottom: 16px; }
+
+  .input-group label {
+    display: block; font-size: 13px; color: var(--muted);
+    margin-bottom: 6px; font-weight: 500;
+  }
+
+  .input-group input,
+  .input-group select {
+    width: 100%; padding: 12px 16px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 16px; font-family: inherit; outline: none;
+  }
+
+  .input-group input:focus,
+  .input-group select:focus { border-color: var(--accent); }
+
+  .help-text {
+    margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+
+  .btn {
+    padding: 14px 28px; border: none; border-radius: 8px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; font-family: inherit;
+  }
+
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-primary {
+    background: var(--accent); color: white; width: 100%;
+    font-size: 18px; padding: 16px;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: #6d28d9; }
+
+  .btn-start {
+    background: var(--accept); color: white; width: 100%;
+    font-size: 18px; padding: 16px;
+  }
+
+  .btn-start:hover:not(:disabled) { background: #16a34a; }
+
+  /* ── Shared ── */
+
+  .share-link {
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+    text-align: center; font-size: 13px; color: var(--muted);
+  }
+
+  .share-link a { color: var(--accent); font-weight: 600; text-decoration: none; font-size: 15px; }
+
+  .rules-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; font-family: 'Courier New', monospace; font-size: 13px;
+    line-height: 1.6; white-space: pre-wrap; color: var(--muted);
+    max-height: 400px; overflow-y: auto;
+  }
+
+  .countdown-bar {
+    text-align: center; padding: 10px 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;
+    font-size: 13px; color: var(--muted);
+  }
+
+  .countdown-bar .time {
+    font-family: 'Press Start 2P', monospace; font-size: 14px;
+    color: var(--accent); margin-left: 8px;
+  }
+
+  .countdown-bar .time.urgent { color: var(--deny); animation: pulse 1s ease-in-out infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ── Lobby: Player List ── */
+
+  .player-list { list-style: none; }
+
+  .player-list li {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; font-size: 14px;
+  }
+
+  .player-list li:last-child { border-bottom: none; }
+
+  .player-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accept); flex-shrink: 0;
+  }
+
+  .player-you { color: var(--accent); font-weight: 600; }
+
+  .waiting-pulse {
+    font-family: 'Press Start 2P', monospace; font-size: 12px;
+    color: var(--muted); text-align: center; padding: 20px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* ── Admin section ── */
+
+  .admin-section {
+    border-top: 1px solid var(--border); margin-top: 20px; padding-top: 20px;
+  }
+
+  .admin-section h3 {
+    font-size: 13px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 12px;
+  }
+
+  .admin-row { display: flex; gap: 12px; }
+
+  .admin-row input { flex: 1; padding: 10px 14px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    font-size: 14px; font-family: monospace; outline: none;
+  }
+
+  .admin-row .btn {
+    padding: 10px 20px; font-size: 14px; white-space: nowrap;
+  }
+
+  /* ── Game Screen ── */
+
+  .game-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+  }
+
+  .stat-bar { display: flex; gap: 20px; flex-wrap: wrap; }
+
+  .stat { text-align: center; }
+
+  .stat-value {
+    font-weight: 700; font-family: 'Press Start 2P', monospace; font-size: 16px;
+  }
+
+  .stat-label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-top: 4px;
+  }
+
+  .customer-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; margin-bottom: 20px;
+  }
+
+  .customer-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+  }
+
+  .customer-id { font-family: 'Press Start 2P', monospace; font-size: 14px; color: var(--accent); }
+  .customer-number { color: var(--muted); font-size: 14px; }
+
+  .file-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px; }
+
+  .file-link {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 16px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); text-decoration: none;
+    font-weight: 500; font-size: 14px; transition: all 0.15s;
+  }
+
+  .file-link:hover { border-color: var(--accent); }
+
+  .file-link .icon { font-size: 20px; }
+
+  .decision-buttons {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px;
+  }
+
+  .btn-accept { background: var(--accept); color: white; font-size: 20px; padding: 20px; border-radius: 12px; }
+  .btn-accept:hover { background: #16a34a; }
+  .btn-deny { background: var(--deny); color: white; font-size: 20px; padding: 20px; border-radius: 12px; }
+  .btn-deny:hover { background: #dc2626; }
+
+  .keyboard-hint { text-align: center; color: var(--muted); font-size: 12px; margin-top: 12px; }
+
+  kbd {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px; font-family: inherit; font-size: 11px;
+  }
+
+  /* ── Feedback ── */
+
+  .feedback-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+  }
+
+  .feedback-overlay.show { opacity: 1; }
+
+  .feedback-card {
+    background: var(--surface); border: 2px solid; border-radius: 16px;
+    padding: 32px 48px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .feedback-card.correct { border-color: var(--correct); box-shadow: 0 0 40px rgba(34,197,94,0.2); }
+  .feedback-card.incorrect { border-color: var(--incorrect); box-shadow: 0 0 40px rgba(239,68,68,0.2); }
+
+  .feedback-icon { font-size: 48px; margin-bottom: 12px; }
+  .feedback-text { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .feedback-explanation { font-size: 13px; color: var(--muted); max-width: 400px; line-height: 1.5; }
+
+  /* ── Streak ── */
+
+  .streak-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+    background: var(--gold)20; border: 1px solid var(--gold); border-radius: 20px;
+    font-size: 13px; color: var(--gold); font-weight: 600;
+  }
+
+  .streak-badge.hidden { display: none; }
+
+  /* ── Leaderboard ── */
+
+  .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+
+  .leaderboard-table th {
+    text-align: left; padding: 12px 16px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .leaderboard-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .leaderboard-table tr.you { background: var(--accent)15; }
+  .rank-1 { color: var(--gold); font-weight: 700; }
+  .rank-2 { color: var(--silver); font-weight: 600; }
+  .rank-3 { color: var(--bronze); font-weight: 600; }
+
+  /* ── Tabs ── */
+
+  .nav-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+
+  .nav-tab {
+    padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 14px;
+    font-weight: 500; transition: all 0.15s;
+  }
+
+  .nav-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .nav-tab:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+
+  .done-card { text-align: center; padding: 40px; }
+  .done-card h2 { font-family: 'Press Start 2P', monospace; font-size: 20px; color: var(--accent); margin-bottom: 16px; }
+  .done-stats { display: flex; justify-content: center; gap: 32px; margin: 24px 0; }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+
+  /* ── API Docs ── */
+
+  .session-id-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; margin-bottom: 16px; font-size: 13px; color: var(--muted);
+  }
+
+  .session-id-bar code {
+    background: var(--bg); padding: 4px 10px; border-radius: 4px;
+    font-family: 'Courier New', monospace; font-size: 14px; color: var(--accent);
+    letter-spacing: 1px; user-select: all;
+  }
+
+  .btn-copy {
+    padding: 4px 10px; font-size: 11px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 4px; color: var(--muted);
+    cursor: pointer; font-family: inherit;
+  }
+
+  .btn-copy:hover { border-color: var(--accent); color: var(--text); }
+
+  .api-section { margin-bottom: 24px; }
+  .api-section h3 { font-size: 14px; color: var(--accent); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+  .api-endpoint { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .api-method { font-family: 'Courier New', monospace; font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .api-method .method { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; }
+  .method-get { background: #22c55e30; color: #22c55e; }
+  .method-post { background: #3b82f630; color: #3b82f6; }
+  .api-desc { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .api-example {
+    background: var(--surface2); border-radius: 6px; padding: 10px 14px; margin-top: 8px;
+    font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6;
+    overflow-x: auto; white-space: pre; color: var(--text);
+  }
+
+  .api-flow { background: var(--bg); border: 1px solid rgba(124,58,237,0.27); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .api-flow ol { padding-left: 20px; line-height: 2; font-size: 13px; }
+  .api-flow code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  @media (max-width: 600px) {
+    .file-links { grid-template-columns: 1fr; }
+    .decision-buttons { grid-template-columns: 1fr; }
+    .stat-bar { gap: 12px; }
+    header h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>THE RETURN DESK</h1>
+  <p class="subtitle">Play solo or compete in an async challenge</p>
+</header>
+
+<div class="container">
+  <div id="share-link" class="share-link" style="display:none">
+    Share this link: <a id="share-url" href="#" target="_blank"></a>
+  </div>
+
+  <!-- ════════════ LOBBY SCREEN ════════════ -->
+  <div id="screen-lobby" class="screen active">
+
+    <div class="card" id="join-card">
+      <h2>Start a Run</h2>
+      <div class="input-group">
+        <label>Your Name</label>
+        <input type="text" id="player-name" placeholder="Enter your name..." autofocus>
+      </div>
+      <div class="input-group">
+        <label>Mode</label>
+        <select id="game-mode">
+          <option value="multiplayer">Async Multiplayer</option>
+          <option value="single">Single Player</option>
+        </select>
+      </div>
+      <div class="input-group" id="challenge-group">
+        <label>Challenge Code</label>
+        <input type="text" id="challenge-code" placeholder="main">
+        <div class="help-text">Players using the same code share a leaderboard, even if they play at different times.</div>
+      </div>
+      <button class="btn btn-primary" id="join-btn" onclick="joinLobby()">Join Challenge</button>
+    </div>
+
+    <div class="card">
+      <h2>Decision Rules</h2>
+      <div class="rules-box" id="rules-display">Loading rules...</div>
+    </div>
+  </div>
+
+  <!-- ════════════ GAME SCREEN ════════════ -->
+  <div id="screen-game" class="screen">
+    <div class="countdown-bar">
+      Time remaining in this run: <span id="game-countdown" class="time">--:--</span>
+    </div>
+
+    <div class="session-id-bar">
+      Your Session ID: <code id="session-id-display">—</code>
+      <button class="btn-copy" onclick="copySessionId()">Copy</button>
+      <span style="flex:1"></span>
+      <span id="session-mode-label" style="font-size:11px">Use this in the API tab to build an agent that plays for you</span>
+    </div>
+
+    <div class="nav-tabs">
+      <div id="tab-button-play" class="nav-tab active" onclick="showTab('play', this)">Play</div>
+      <div id="tab-button-leaderboard" class="nav-tab" onclick="showTab('leaderboard', this)">Leaderboard</div>
+      <div id="tab-button-rules" class="nav-tab" onclick="showTab('rules', this)">Rules</div>
+      <div id="tab-button-api" class="nav-tab" onclick="showTab('api', this)">API</div>
+    </div>
+
+    <!-- Play Tab -->
+    <div id="tab-play" class="game-tab">
+      <div class="game-header">
+        <div class="stat-bar">
+          <div class="stat">
+            <div class="stat-value" id="stat-score">0</div>
+            <div class="stat-label">Score</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="stat-correct">0/0</div>
+            <div class="stat-label">Correct</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="stat-accuracy">—</div>
+            <div class="stat-label">Accuracy</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="stat-avg-time">—</div>
+            <div class="stat-label">Avg Time</div>
+          </div>
+        </div>
+        <div id="streak-badge" class="streak-badge hidden">🔥 <span id="streak-count">0</span></div>
+      </div>
+
+      <div id="customer-area"></div>
+    </div>
+
+    <!-- Leaderboard Tab -->
+    <div id="tab-leaderboard" class="game-tab" style="display:none">
+      <div class="card"><h2>Leaderboard</h2><div id="game-leaderboard"></div></div>
+    </div>
+
+    <!-- Rules Tab -->
+    <div id="tab-rules" class="game-tab" style="display:none">
+      <div class="card"><h2>Decision Rules</h2><div class="rules-box" id="game-rules-display"></div></div>
+    </div>
+
+    <!-- API Tab -->
+    <div id="tab-api" class="game-tab" style="display:none">
+      <div class="card">
+        <h2>API Documentation</h2>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:14px;">
+          Build an agent that plays <strong>as you</strong>. Your agent uses your session ID
+          (shown above) so decisions count toward <em>your</em> score on the leaderboard.
+          Base URL: <code id="api-base-url" style="color:var(--accent)">http://localhost:8888</code>
+        </p>
+
+        <div class="api-section">
+          <h3>How It Works</h3>
+          <div class="api-flow">
+            <p style="margin-bottom:10px;color:var(--text)">Start a solo run or join a challenge through the UI, then hand your session ID to your agent and let it play for you.</p>
+            <ol>
+              <li><strong>Start your run</strong> — enter your name and choose single-player or multiplayer</li>
+              <li><strong>Copy your session ID</strong> from the bar above</li>
+              <li><strong>Give it to your agent</strong> — it calls the API using your session</li>
+              <li>Agent loop: <code>GET /api/session/{your_id}/next</code> → download files → analyze → <code>POST /api/session/{your_id}/decide</code></li>
+              <li>Your score updates on the leaderboard in real time</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <h3>Agent Loop Endpoints</h3>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span>/next</div>
+            <div class="api-desc">Get the next customer and download URLs for the 3 files.</div>
+            <div class="api-example"># Response:
+{
+  "customer_id": "CUST-0042",
+  "number": 5,
+  "files": {
+    "receipt": "/api/files/CUST-0042/receipt.pdf",
+    "transactions": "/api/files/CUST-0042/transactions.xlsx",
+    "fraud_report": "/api/files/CUST-0042/fraud_report.pptx"
+  }
+}</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-post">POST</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span>/decide</div>
+            <div class="api-desc">Submit your decision. Body: <code>{"customer_id": "CUST-0042", "decision": "ACCEPT"}</code></div>
+            <div class="api-desc">Decision must be <code>"ACCEPT"</code> or <code>"DENY"</code>.</div>
+            <div class="api-desc">Returns: <code>{"correct": true, "explanation": "Rule 2: ..."}</code></div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <h3>File Endpoints (download &amp; analyze these)</h3>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/files/{customer_id}/receipt.pdf</div>
+            <div class="api-desc">Receipt PDF — check if a customer photo is present (Rule 1).</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/files/{customer_id}/transactions.xlsx</div>
+            <div class="api-desc">Transaction history — calculate return rate and dollar ratio (Rules 3-4). No summary row.</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/files/{customer_id}/fraud_report.pptx</div>
+            <div class="api-desc">Fraud report deck — the assessment is buried on one slide among filler (Rule 2).</div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <h3>Helper Endpoints</h3>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/session/<span style="color:var(--accent)">{your_session_id}</span></div>
+            <div class="api-desc">Check your current score, accuracy, and avg time.</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/rules</div>
+            <div class="api-desc">Decision rules as text — feed this to your agent so it knows the logic.</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/leaderboard</div>
+            <div class="api-desc">Live rankings. Score = correct × (100 / avg_seconds).</div>
+          </div>
+          <div class="api-endpoint">
+            <div class="api-method"><span class="method method-get">GET</span>/api/time</div>
+            <div class="api-desc">App defaults, or pass <code>?session_id=...</code> for per-session countdown and state.</div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <h3>Example — Full Agent Loop</h3>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:10px">
+            Copy your session ID from above and paste it as <code>SID</code> below.
+          </p>
+          <div class="api-example">BASE="http://localhost:8888"
+SID="<span style="color:#7c3aed">paste-your-session-id-here</span>"
+
+# Loop: get customer → download files → decide
+while true; do
+  NEXT=$(curl -s $BASE/api/session/$SID/next)
+  CID=$(echo $NEXT | jq -r .customer_id)
+
+  # Download the 3 files
+  curl -s $BASE/api/files/$CID/receipt.pdf -o receipt.pdf
+  curl -s $BASE/api/files/$CID/transactions.xlsx -o tx.xlsx
+  curl -s $BASE/api/files/$CID/fraud_report.pptx -o fraud.pptx
+
+  # TODO: Analyze files and determine ACCEPT or DENY
+  # - receipt.pdf: is there a customer photo?
+  # - tx.xlsx: calculate return_rate and dollar_ratio
+  # - fraud.pptx: find the assessment slide
+  # - Apply rules 1-5 in order
+
+  DECISION="ACCEPT"  # or "DENY"
+
+  curl -s -X POST $BASE/api/session/$SID/decide \
+    -H "Content-Type: application/json" \
+    -d "{\"customer_id\":\"$CID\",\"decision\":\"$DECISION\"}"
+done</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ ENDED SCREEN ════════════ -->
+  <div id="screen-ended" class="screen">
+    <div class="card" style="text-align:center;padding:40px">
+      <h2 style="font-family:'Press Start 2P',monospace;font-size:24px;color:var(--deny);margin-bottom:12px">TIME'S UP!</h2>
+      <p style="color:var(--muted);margin-bottom:24px">The game has ended. Final standings below.</p>
+    </div>
+    <div class="card">
+      <h2>Final Leaderboard</h2>
+      <div id="final-leaderboard"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Feedback Overlay -->
+<div id="feedback-overlay" class="feedback-overlay">
+  <div id="feedback-card" class="feedback-card">
+    <div id="feedback-icon" class="feedback-icon"></div>
+    <div id="feedback-text" class="feedback-text"></div>
+    <div id="feedback-explanation" class="feedback-explanation"></div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let sessionId = null;
+let playerName = null;
+let currentCustomer = null;
+let streak = 0;
+let leaderboardInterval = null;
+let countdownInterval = null;
+let submitting = false;
+let currentScreen = 'lobby';
+let sessionMode = 'multiplayer';
+let challengeCode = null;
+let defaultChallengeCode = 'main';
+
+// ── Init ──
+
+async function init() {
+  const rulesRes = await fetch(`${API}/api/rules`);
+  const rulesData = await rulesRes.json();
+  document.getElementById('rules-display').textContent = rulesData.rules;
+  document.getElementById('api-base-url').textContent = window.location.origin;
+
+  try {
+    const statusRes = await fetch(`${API}/api/status`);
+    const statusData = await statusRes.json();
+    defaultChallengeCode = statusData.default_challenge_code || defaultChallengeCode;
+  } catch (e) {}
+
+  const params = new URLSearchParams(window.location.search);
+  const requestedChallenge = params.get('challenge');
+  if (requestedChallenge) {
+    document.getElementById('game-mode').value = 'multiplayer';
+    document.getElementById('challenge-code').value = requestedChallenge;
+  } else if (!document.getElementById('challenge-code').value) {
+    document.getElementById('challenge-code').value = defaultChallengeCode;
+  }
+
+  document.getElementById('game-mode').addEventListener('change', syncModeFields);
+  syncModeFields();
+}
+
+function syncModeFields() {
+  const mode = document.getElementById('game-mode').value;
+  const challengeGroup = document.getElementById('challenge-group');
+  const joinBtn = document.getElementById('join-btn');
+
+  if (mode === 'single') {
+    challengeGroup.style.display = 'none';
+    joinBtn.textContent = 'Start Solo Run';
+  } else {
+    challengeGroup.style.display = 'block';
+    joinBtn.textContent = 'Join Challenge';
+    if (!document.getElementById('challenge-code').value.trim()) {
+      document.getElementById('challenge-code').value = defaultChallengeCode;
+    }
+  }
+}
+
+async function readError(res) {
+  try {
+    const data = await res.json();
+    return data.detail || data;
+  } catch (e) {
+    return {};
+  }
+}
+
+async function fetchSession() {
+  if (!sessionId) return null;
+  const res = await fetch(`${API}/api/session/${sessionId}`);
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+// ── Screen switching ──
+
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+  currentScreen = name;
+}
+
+function updateShareLink() {
+  const share = document.getElementById('share-link');
+  const anchor = document.getElementById('share-url');
+
+  if (sessionMode !== 'multiplayer' || !challengeCode) {
+    share.style.display = 'none';
+    return;
+  }
+
+  const url = `${window.location.origin}${window.location.pathname}?challenge=${encodeURIComponent(challengeCode)}`;
+  share.style.display = 'block';
+  anchor.href = url;
+  anchor.textContent = url;
+}
+
+function updateSessionModeLabel() {
+  const label = document.getElementById('session-mode-label');
+  if (sessionMode === 'multiplayer') {
+    label.textContent = `Challenge: ${challengeCode} • Use this session ID to build an agent that plays for you`;
+  } else {
+    label.textContent = 'Single-player run • Use this session ID to build an agent that plays for you';
+  }
+}
+
+function switchToGame() {
+  switchScreen('game');
+  document.getElementById('game-rules-display').textContent =
+    document.getElementById('rules-display').textContent;
+  document.getElementById('session-id-display').textContent = sessionId;
+  updateSessionModeLabel();
+  updateShareLink();
+
+  clearInterval(leaderboardInterval);
+  clearInterval(countdownInterval);
+  leaderboardInterval = setInterval(refreshGameLeaderboard, 5000);
+  countdownInterval = setInterval(updateCountdown, 1000);
+
+  updateStats();
+  updateCountdown();
+  refreshGameLeaderboard();
+  loadNextCustomer();
+}
+
+function copySessionId() {
+  if (!sessionId) return;
+  navigator.clipboard.writeText(sessionId).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+async function switchToEnded() {
+  if (currentScreen === 'ended') return;
+
+  switchScreen('ended');
+  clearInterval(leaderboardInterval);
+  clearInterval(countdownInterval);
+  currentCustomer = null;
+
+  const stats = await fetchSession();
+  let html = '';
+
+  if (stats) {
+    html += `
+      <div class="done-card">
+        <h2>RUN COMPLETE</h2>
+        <div class="done-stats">
+          <div class="stat">
+            <div class="stat-value">${stats.score.toFixed(0)}</div>
+            <div class="stat-label">Score</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${stats.correct}/${stats.total}</div>
+            <div class="stat-label">Correct</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${stats.total > 0 ? `${stats.accuracy}%` : '—'}</div>
+            <div class="stat-label">Accuracy</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${stats.total > 0 ? `${stats.avg_time}s` : '—'}</div>
+            <div class="stat-label">Avg Time</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (sessionMode === 'multiplayer') {
+    html += await renderLeaderboard();
+  } else {
+    html += '<div class="empty-state">Single-player runs are tracked only for your current session.</div>';
+  }
+
+  document.getElementById('final-leaderboard').innerHTML = html;
+}
+
+// ── Lobby ──
+
+async function joinLobby() {
+  const name = document.getElementById('player-name').value.trim();
+  const mode = document.getElementById('game-mode').value;
+  const challengeInput = document.getElementById('challenge-code').value.trim();
+
+  if (!name) {
+    document.getElementById('player-name').focus();
+    return;
+  }
+
+  const body = { name, mode };
+  if (mode === 'multiplayer') {
+    body.challenge_code = challengeInput || defaultChallengeCode;
+  }
+
+  const res = await fetch(`${API}/api/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await readError(res);
+    alert(err.message || err.detail || 'Unable to start a session.');
+    return;
+  }
+
+  const data = await res.json();
+  sessionId = data.session_id;
+  playerName = data.name;
+  sessionMode = data.mode;
+  challengeCode = data.challenge_code;
+  streak = 0;
+  updateStreak();
+  switchToGame();
+}
+
+// ── Countdown ──
+
+async function updateCountdown() {
+  const stats = await fetchSession();
+  if (!stats) return;
+
+  const el = document.getElementById('game-countdown');
+  if (stats.state === 'ended') {
+    el.textContent = "TIME'S UP";
+    el.classList.add('urgent');
+    switchToEnded();
+    return;
+  }
+
+  const mins = Math.floor(stats.remaining_seconds / 60);
+  const secs = stats.remaining_seconds % 60;
+  el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  el.classList.toggle('urgent', stats.remaining_seconds < 300);
+}
+
+// ── Game ──
+
+async function loadNextCustomer() {
+  try {
+    const res = await fetch(`${API}/api/session/${sessionId}/next`);
+    if (!res.ok) {
+      const err = await readError(res);
+      if (err.error === 'session_ended') {
+        switchToEnded();
+      }
+      return;
+    }
+
+    const data = await res.json();
+    currentCustomer = data;
+    document.getElementById('customer-area').innerHTML = `
+      <div class="customer-card">
+        <div class="customer-header">
+          <span class="customer-id">${data.customer_id}</span>
+          <span class="customer-number">#${data.number}</span>
+        </div>
+        <div class="file-links">
+          <a class="file-link" href="${data.files.receipt}" target="_blank">
+            <span class="icon">📄</span> Receipt (PDF)
+          </a>
+          <a class="file-link" href="${data.files.transactions}" target="_blank">
+            <span class="icon">📊</span> Transactions (XLSX)
+          </a>
+          <a class="file-link" href="${data.files.fraud_report}" target="_blank">
+            <span class="icon">📑</span> Fraud Report (PPTX)
+          </a>
+        </div>
+      </div>
+      <div class="decision-buttons">
+        <button class="btn btn-accept" onclick="submitDecision('ACCEPT')">✓ ACCEPT</button>
+        <button class="btn btn-deny" onclick="submitDecision('DENY')">✗ DENY</button>
+      </div>
+      <div class="keyboard-hint"><kbd>Enter</kbd> Accept &nbsp;&nbsp; <kbd>Backspace</kbd> Deny</div>
+    `;
+  } catch (e) {}
+}
+
+async function submitDecision(decision) {
+  if (!currentCustomer || submitting) return;
+  submitting = true;
+
+  try {
+    const res = await fetch(`${API}/api/session/${sessionId}/decide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: currentCustomer.customer_id, decision }),
+    });
+
+    if (!res.ok) {
+      const err = await readError(res);
+      if (err.error === 'session_ended') {
+        switchToEnded();
+        return;
+      }
+      submitting = false;
+      return;
+    }
+
+    const data = await res.json();
+    streak = data.correct ? streak + 1 : 0;
+    updateStreak();
+    showFeedback(data.correct, data.explanation);
+    await updateStats();
+    await refreshGameLeaderboard();
+
+    setTimeout(() => {
+      submitting = false;
+      loadNextCustomer();
+    }, 1200);
+  } catch (e) {
+    submitting = false;
+  }
+}
+
+function showFeedback(correct, explanation) {
+  const overlay = document.getElementById('feedback-overlay');
+  const card = document.getElementById('feedback-card');
+  card.className = `feedback-card ${correct ? 'correct' : 'incorrect'}`;
+  document.getElementById('feedback-icon').textContent = correct ? '✓' : '✗';
+  const text = document.getElementById('feedback-text');
+  text.textContent = correct ? 'CORRECT!' : 'WRONG';
+  text.style.color = correct ? 'var(--correct)' : 'var(--incorrect)';
+  document.getElementById('feedback-explanation').textContent = explanation;
+  overlay.classList.add('show');
+  setTimeout(() => overlay.classList.remove('show'), 1100);
+}
+
+async function updateStats() {
+  const data = await fetchSession();
+  if (!data) return;
+  document.getElementById('stat-score').textContent = data.score.toFixed(0);
+  document.getElementById('stat-correct').textContent = `${data.correct}/${data.total}`;
+  document.getElementById('stat-accuracy').textContent = data.total > 0 ? `${data.accuracy}%` : '—';
+  document.getElementById('stat-avg-time').textContent = data.total > 0 ? `${data.avg_time}s` : '—';
+}
+
+function updateStreak() {
+  const badge = document.getElementById('streak-badge');
+  const count = document.getElementById('streak-count');
+  if (streak >= 2) {
+    badge.classList.remove('hidden');
+    count.textContent = streak;
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// ── Tabs ──
+
+function showTab(tab, el) {
+  document.querySelectorAll('.game-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).style.display = 'block';
+  el.classList.add('active');
+  if (tab === 'leaderboard') refreshGameLeaderboard();
+}
+
+// ── Leaderboard ──
+
+async function refreshGameLeaderboard() {
+  document.getElementById('game-leaderboard').innerHTML = await renderLeaderboard();
+}
+
+async function renderLeaderboard() {
+  if (sessionMode !== 'multiplayer') {
+    return '<div class="empty-state">Single-player runs do not participate in a shared leaderboard.</div>';
+  }
+
+  const params = new URLSearchParams({
+    mode: 'multiplayer',
+    challenge_code: challengeCode || defaultChallengeCode,
+  });
+  const res = await fetch(`${API}/api/leaderboard?${params.toString()}`);
+  const data = await res.json();
+  if (data.length === 0) {
+    return `<div class="empty-state">No scores yet for challenge <strong>${challengeCode}</strong>.</div>`;
+  }
+
+  let html = `<div class="help-text" style="margin-bottom:12px">Challenge <strong>${challengeCode}</strong></div>`;
+  html += `<table class="leaderboard-table"><thead><tr>
+    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th>
+  </tr></thead><tbody>`;
+
+  for (const e of data) {
+    const isYou = e.session_id === sessionId;
+    const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : e.rank;
+    const rc = e.rank <= 3 ? `rank-${e.rank}` : '';
+    html += `<tr class="${isYou ? 'you' : ''}">
+      <td class="${rc}">${medal}</td>
+      <td>${e.name}${isYou ? ' (you)' : ''}</td>
+      <td>${e.correct}/${e.total}</td>
+      <td>${e.accuracy}%</td>
+      <td>${e.avg_time}s</td>
+      <td style="font-weight:700">${e.score.toFixed(1)}</td>
+    </tr>`;
+  }
+  return html + '</tbody></table>';
+}
+
+// ── Keyboard ──
+
+document.addEventListener('keydown', (e) => {
+  if (currentScreen !== 'game' || !currentCustomer || submitting) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    submitDecision('ACCEPT');
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    submitDecision('DENY');
+  }
+});
+
+document.getElementById('player-name').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    joinLobby();
+  }
+});
+
+document.getElementById('challenge-code').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    joinLobby();
+  }
+});
+
+// ── Start ──
+init();
+</script>
+</body>
+</html>
