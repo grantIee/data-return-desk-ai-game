@@ -409,12 +409,16 @@
     box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
   }
 
-  .run-chart-legend-dot {
-    width: 10px; height: 10px; border-radius: 999px; display: inline-block;
+  .run-chart-legend-hint {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--muted);
   }
 
-  .run-chart-legend-dot.correct { background: var(--correct); }
-  .run-chart-legend-dot.incorrect { background: var(--incorrect); }
+  .run-chart-legend-hint::before {
+    content: '';
+    width: 8px; height: 8px; border-radius: 999px; background: var(--text);
+    opacity: 0.7;
+  }
 
   .run-chart-grid {
     display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px;
@@ -1399,21 +1403,6 @@ function buildInteractiveLineChart(config) {
     })
     .join('');
 
-  const pointMarkers = points
-    .map(point => `
-      <circle
-        cx="${point.x.toFixed(1)}"
-        cy="${point.y.toFixed(1)}"
-        r="4.5"
-        fill="${point.item.correct ? '#22c55e' : '#ef4444'}"
-        stroke="#0a0a0f"
-        stroke-width="2"
-      >
-        <title>Turn ${point.item.number}: ${point.item.cumulative_accuracy}% accuracy, ${point.item.correct ? 'correct' : 'incorrect'}, ${formatSeconds(point.item.time_taken)}</title>
-      </circle>
-    `)
-    .join('');
-
   return `
     <div class="run-chart">
       <div class="run-chart-header">
@@ -1423,8 +1412,7 @@ function buildInteractiveLineChart(config) {
         </div>
         <div class="run-chart-legend">
           <span class="run-chart-legend-item"><span class="run-chart-legend-line" style="border-top-color:${lineColor};box-shadow:0 0 12px ${fillColor}"></span>${primaryLabel}</span>
-          <span class="run-chart-legend-item"><span class="run-chart-legend-dot correct"></span>Correct turn</span>
-          <span class="run-chart-legend-item"><span class="run-chart-legend-dot incorrect"></span>Incorrect turn</span>
+          <span class="run-chart-legend-hint">Hover to inspect each turn</span>
         </div>
       </div>
       <div class="run-chart-grid">
@@ -1445,8 +1433,7 @@ function buildInteractiveLineChart(config) {
             ></polyline>
             <line id="${chartId}-guide-x" x1="${chartLeft}" y1="${chartTop}" x2="${chartLeft}" y2="${chartBottom}" stroke="rgba(224,224,232,0.28)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"></line>
             <line id="${chartId}-guide-y" x1="${chartLeft}" y1="${chartBottom}" x2="${chartRight}" y2="${chartBottom}" stroke="rgba(224,224,232,0.18)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"></line>
-            ${pointMarkers}
-            <circle id="${chartId}-active-point" cx="${chartLeft}" cy="${chartBottom}" r="7" fill="${lineColor}" stroke="#0a0a0f" stroke-width="3" opacity="0"></circle>
+            <circle id="${chartId}-active-point" cx="${chartLeft}" cy="${chartBottom}" r="6" fill="${lineColor}" stroke="#0a0a0f" stroke-width="3" opacity="0"></circle>
             ${hoverBands}
           </svg>
           <div id="${chartId}-tooltip" class="run-chart-tooltip"></div>
