@@ -409,17 +409,6 @@
     box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
   }
 
-  .run-chart-legend-hint {
-    display: inline-flex; align-items: center; gap: 8px;
-    color: var(--muted);
-  }
-
-  .run-chart-legend-hint::before {
-    content: '';
-    width: 8px; height: 8px; border-radius: 999px; background: var(--text);
-    opacity: 0.7;
-  }
-
   .run-chart-grid {
     display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px;
     align-items: stretch;
@@ -466,15 +455,6 @@
 
   .run-chart-tooltip-row strong {
     color: var(--text); font-weight: 600;
-  }
-
-  .run-insights {
-    display: grid; gap: 10px; margin-bottom: 14px;
-  }
-
-  .run-insight {
-    background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent);
-    border-radius: 10px; padding: 12px 14px; color: var(--muted); font-size: 13px; line-height: 1.5;
   }
 
   .run-note {
@@ -1156,11 +1136,6 @@ async function switchToEnded() {
   document.getElementById('final-leaderboard').innerHTML = html;
 }
 
-function averageTurnTime(history) {
-  if (!history.length) return null;
-  return history.reduce((sum, item) => sum + item.time_taken, 0) / history.length;
-}
-
 function segmentAccuracy(history) {
   if (!history.length) return null;
   const correct = history.filter(item => item.correct).length;
@@ -1202,51 +1177,6 @@ function buildTickValues(min, max, steps) {
     ticks.push(max - (range * i) / steps);
   }
   return ticks;
-}
-
-function buildRunInsights(stats, history) {
-  const insights = [];
-  const midpoint = Math.ceil(history.length / 2);
-  const firstHalf = history.slice(0, midpoint);
-  const secondHalf = history.slice(midpoint);
-  const firstHalfAvg = averageTurnTime(firstHalf);
-  const secondHalfAvg = averageTurnTime(secondHalf);
-  const firstHalfAccuracy = segmentAccuracy(firstHalf);
-  const secondHalfAccuracy = segmentAccuracy(secondHalf);
-
-  if (stats.accuracy < 65) {
-    insights.push('Accuracy was the main limiter on this run. Slow down slightly and re-check the rule order before you lock a decision.');
-  } else if (stats.avg_time > 12 && stats.accuracy >= 75) {
-    insights.push('You were accurate, but several turns ran long. A fixed scan order across the three files should lift your score.');
-  } else if (stats.accuracy >= 80 && stats.avg_time <= 8) {
-    insights.push('You kept a strong balance of speed and accuracy. The next gains are in trimming hesitation on the slowest turns.');
-  }
-
-  if (stats.slowest_time && stats.fastest_time && stats.slowest_time > stats.fastest_time * 2.2) {
-    insights.push('Your pacing swung a lot from turn to turn. Standardizing the order you inspect the files should smooth out the slow decisions.');
-  }
-
-  if (firstHalfAvg !== null && secondHalfAvg !== null) {
-    if (secondHalfAvg > firstHalfAvg * 1.15) {
-      insights.push('You slowed down in the back half of the run. A shorter late-run checklist would help preserve pace.');
-    } else if (secondHalfAvg < firstHalfAvg * 0.85) {
-      insights.push('You sped up after the opening turns. Starting with that later-run rhythm would buy more decisions.');
-    }
-  }
-
-  if (firstHalfAccuracy !== null && secondHalfAccuracy !== null) {
-    if (secondHalfAccuracy + 10 < firstHalfAccuracy) {
-      insights.push('Accuracy faded later in the run. A quick rule sanity check before submit could protect late-game points.');
-    } else if (secondHalfAccuracy > firstHalfAccuracy + 10) {
-      insights.push('Your reads improved as the run went on. A short warm-up pass through the rule order may help you hit that level sooner.');
-    }
-  }
-
-  if (!insights.length) {
-    insights.push('This run was fairly balanced. The biggest score gains now come from shaving time off the slowest turns without losing accuracy.');
-  }
-
-  return insights.slice(0, 3);
 }
 
 function updateRunChartHover(chartId, trigger, event) {
@@ -1412,7 +1342,6 @@ function buildInteractiveLineChart(config) {
         </div>
         <div class="run-chart-legend">
           <span class="run-chart-legend-item"><span class="run-chart-legend-line" style="border-top-color:${lineColor};box-shadow:0 0 12px ${fillColor}"></span>${primaryLabel}</span>
-          <span class="run-chart-legend-hint">Hover to inspect each turn</span>
         </div>
       </div>
       <div class="run-chart-grid">
@@ -1455,26 +1384,9 @@ function renderRunBreakdown(stats, options = {}) {
   if (!history.length) return '';
 
   const splitIndex = Math.max(1, Math.floor(history.length / 2));
-  const openingSegment = history.slice(0, splitIndex);
   const closingSegment = history.slice(splitIndex);
   const measuredClosingSegment = closingSegment.length ? closingSegment : history;
   const finishAccuracy = segmentAccuracy(measuredClosingSegment);
-  const firstHalfAvg = averageTurnTime(openingSegment);
-  const secondHalfAvg = averageTurnTime(measuredClosingSegment);
-  let paceTrend = 'Steady';
-
-  if (firstHalfAvg !== null && secondHalfAvg !== null) {
-    if (secondHalfAvg > firstHalfAvg + 0.5) {
-      paceTrend = 'Slower late';
-    } else if (secondHalfAvg < firstHalfAvg - 0.5) {
-      paceTrend = 'Faster late';
-    }
-  }
-
-  const insights = buildRunInsights(stats, history)
-    .map(text => `<div class="run-insight">${text}</div>`)
-    .join('');
-
   const maxTurnTime = Math.max(...history.map(item => item.time_taken), 0.1);
   const speedChartMax = niceCeil(maxTurnTime * 1.1);
 
@@ -1501,10 +1413,6 @@ function renderRunBreakdown(stats, options = {}) {
           <div class="run-metric-label">Finish Accuracy</div>
           <div class="run-metric-value">${finishAccuracy === null ? '—' : `${finishAccuracy.toFixed(1).replace(/\.0$/, '')}%`}</div>
         </div>
-        <div class="run-metric">
-          <div class="run-metric-label">Pace Trend</div>
-          <div class="run-metric-value">${paceTrend}</div>
-        </div>
       </div>
       <div class="run-charts">
         ${buildInteractiveLineChart({
@@ -1521,7 +1429,7 @@ function renderRunBreakdown(stats, options = {}) {
           ariaLabel: 'Cumulative accuracy over the run',
           primaryLabel: 'Cumulative accuracy',
         })}
-        ${buildInteractiveLineChart({
+      ${buildInteractiveLineChart({
           history,
           title: 'Speed By Turn',
           subtitle: 'Total decision time for each customer.',
@@ -1536,7 +1444,6 @@ function renderRunBreakdown(stats, options = {}) {
           primaryLabel: 'Decision time',
         })}
       </div>
-      <div class="run-insights">${insights}</div>
       ${includeNote ? `
       <div class="run-note">
         Turn time is currently measured end to end, from loading a customer to submitting the decision. It reflects your total pace, not isolated API or file-download latency yet.

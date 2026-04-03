@@ -31,6 +31,17 @@ Based on these files, decide `ACCEPT` or `DENY`.
 
 ## Decision Rules
 
+What is happening:
+
+- Customers arrive at the return desk one at a time.
+- Each one comes with a receipt PDF, a transaction spreadsheet, and a fraud report deck.
+
+What needs to be done:
+
+- Decide `ACCEPT` or `DENY` for each customer before time runs out.
+- Move fast, but follow the rule order exactly because the first matching rule wins.
+- Loyalty tier is hidden from the 3 files and may require a separate lookup by `customer_id`.
+
 Evaluate in order. Stop at the first rule that triggers.
 
 Definitions:
