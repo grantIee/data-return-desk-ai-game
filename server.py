@@ -116,10 +116,48 @@ def get_session_state(session: Session, now: float | None = None) -> str:
     return "active"
 
 
+def build_decision_history(session: Session) -> list[dict[str, Any]]:
+    history: list[dict[str, Any]] = []
+    correct_so_far = 0
+
+    for index, decision in enumerate(session.decisions, start=1):
+        if decision.correct:
+            correct_so_far += 1
+
+        history.append(
+            {
+                "number": index,
+                "customer_id": decision.customer_id,
+                "decision": decision.decision.value,
+                "correct": decision.correct,
+                "time_taken": round(decision.time_taken, 2),
+                "cumulative_accuracy": round((correct_so_far / index) * 100, 1),
+            }
+        )
+
+    return history
+
+
+def best_correct_streak(session: Session) -> int:
+    best = 0
+    current = 0
+
+    for decision in session.decisions:
+        if decision.correct:
+            current += 1
+            best = max(best, current)
+        else:
+            current = 0
+
+    return best
+
+
 def session_summary(session: Session, now: float | None = None) -> dict:
     now = now or time.time()
     state = get_session_state(session, now)
     elapsed_from = session.started_at or session.created_at
+    history = build_decision_history(session)
+    times = [decision.time_taken for decision in session.decisions]
 
     return {
         "id": session.id,
@@ -137,7 +175,38 @@ def session_summary(session: Session, now: float | None = None) -> dict:
         "score": round(session.score, 1),
         "elapsed": round(max(0.0, now - elapsed_from), 1),
         "current_customer_index": session.current_customer_index,
+        "best_streak": best_correct_streak(session),
+        "fastest_time": round(min(times), 2) if times else None,
+        "slowest_time": round(max(times), 2) if times else None,
+        "decision_history": history,
     }
+
+
+def build_leaderboard_entries() -> list[dict[str, Any]]:
+    entries = []
+    for session in session_store.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None):
+        if session.total_count == 0:
+            continue
+
+        entries.append(
+            {
+                "session_id": session.id,
+                "name": session.name,
+                "state": get_session_state(session),
+                "correct": session.correct_count,
+                "total": session.total_count,
+                "accuracy": round(session.accuracy * 100, 1),
+                "avg_time": round(session.avg_time, 2),
+                "score": round(session.score, 1),
+            }
+        )
+
+    entries.sort(key=lambda entry: (entry["score"], entry["correct"], -entry["avg_time"]), reverse=True)
+
+    for index, entry in enumerate(entries, start=1):
+        entry["rank"] = index
+
+    return entries
 
 
 def current_customer_for_session(session: Session) -> Customer:
@@ -403,30 +472,39 @@ async def submit_decision(session_id: str, req: DecisionRequest, request: Reques
 
 @app.get("/api/leaderboard")
 async def get_leaderboard():
-    entries = []
-    for session in session_store.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None):
-        if session.total_count == 0:
-            continue
+    return build_leaderboard_entries()
 
-        entries.append(
-            {
-                "session_id": session.id,
-                "name": session.name,
-                "state": get_session_state(session),
-                "correct": session.correct_count,
-                "total": session.total_count,
-                "accuracy": round(session.accuracy * 100, 1),
-                "avg_time": round(session.avg_time, 2),
-                "score": round(session.score, 1),
-            }
-        )
 
-    entries.sort(key=lambda entry: (entry["score"], entry["correct"], -entry["avg_time"]), reverse=True)
+@app.get("/api/leaderboard/{session_id}")
+async def get_public_run_breakdown(session_id: str):
+    session = get_session_or_404(session_id)
+    if session.mode != GameMode.SINGLE_PLAYER or session.total_count == 0:
+        raise HTTPException(status_code=404, detail="Run not found")
 
-    for index, entry in enumerate(entries, start=1):
-        entry["rank"] = index
+    if get_session_state(session) != "ended":
+        raise HTTPException(status_code=403, detail="Run breakdowns are public only after a run ends")
 
-    return entries
+    summary = session_summary(session)
+    leaderboard_entry = next(
+        (entry for entry in build_leaderboard_entries() if entry["session_id"] == session_id),
+        None,
+    )
+
+    return {
+        "id": summary["id"],
+        "name": summary["name"],
+        "state": summary["state"],
+        "rank": leaderboard_entry["rank"] if leaderboard_entry else None,
+        "correct": summary["correct"],
+        "total": summary["total"],
+        "accuracy": summary["accuracy"],
+        "avg_time": summary["avg_time"],
+        "score": summary["score"],
+        "best_streak": summary["best_streak"],
+        "fastest_time": summary["fastest_time"],
+        "slowest_time": summary["slowest_time"],
+        "decision_history": summary["decision_history"],
+    }
 
 
 # ── Admin endpoints ──

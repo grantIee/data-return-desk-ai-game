@@ -307,6 +307,21 @@
   .rank-2 { color: var(--silver); font-weight: 600; }
   .rank-3 { color: var(--bronze); font-weight: 600; }
   .hall-intro { margin-bottom: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .leaderboard-action-cell { text-align: right; white-space: nowrap; }
+
+  .leaderboard-action-btn {
+    padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+
+  .leaderboard-action-btn:hover {
+    border-color: var(--accent); color: white; background: var(--accent);
+  }
+
+  .leaderboard-action-note {
+    color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+  }
 
   /* ── Tabs ── */
 
@@ -323,7 +338,115 @@
 
   .done-card { text-align: center; padding: 40px; }
   .done-card h2 { font-family: 'Press Start 2P', monospace; font-size: 20px; color: var(--accent); margin-bottom: 16px; }
-  .done-stats { display: flex; justify-content: center; gap: 32px; margin: 24px 0; }
+  .done-stats { display: flex; justify-content: center; gap: 32px; margin: 24px 0; flex-wrap: wrap; }
+
+  .run-breakdown {
+    margin-top: 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px;
+  }
+
+  .run-breakdown-header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+
+  .run-breakdown-header h3 { font-size: 18px; margin: 0; }
+  .run-breakdown-header p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  .run-breakdown-metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+
+  .run-metric {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px;
+  }
+
+  .run-metric-label {
+    color: var(--muted); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 8px;
+  }
+
+  .run-metric-value { font-size: 24px; font-weight: 700; }
+
+  .run-chart {
+    display: flex; align-items: flex-end; gap: 10px; overflow-x: auto;
+    padding: 8px 0 4px; margin-bottom: 18px;
+  }
+
+  .run-bar-column {
+    min-width: 36px; flex: 1 0 36px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+
+  .run-bar-label {
+    font-size: 11px; color: var(--muted); white-space: nowrap;
+  }
+
+  .run-bar {
+    width: 100%; max-width: 44px; min-height: 24px;
+    border-radius: 10px 10px 4px 4px; border: 1px solid transparent;
+  }
+
+  .run-bar.correct {
+    background: linear-gradient(180deg, #22c55e, #166534);
+    border-color: rgba(34, 197, 94, 0.35);
+  }
+
+  .run-bar.incorrect {
+    background: linear-gradient(180deg, #ef4444, #991b1b);
+    border-color: rgba(239, 68, 68, 0.35);
+  }
+
+  .run-bar-caption {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  .run-insights {
+    display: grid; gap: 10px; margin-bottom: 14px;
+  }
+
+  .run-insight {
+    background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 12px 14px; color: var(--muted); font-size: 13px; line-height: 1.5;
+  }
+
+  .run-note {
+    border-top: 1px solid var(--border); padding-top: 14px;
+    color: var(--muted); font-size: 12px; line-height: 1.5;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(3, 4, 10, 0.78);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; z-index: 1100;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal-card {
+    width: min(980px, 100%); max-height: calc(100vh - 48px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45); padding: 24px;
+  }
+
+  .modal-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 20px;
+  }
+
+  .modal-header h2 { margin: 0 0 8px 0; }
+  .modal-header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .modal-close { width: auto; padding: 10px 16px; font-size: 14px; flex-shrink: 0; }
+
+  .modal-run-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px; margin-bottom: 18px;
+  }
+
+  .modal-run-summary .run-metric-value { font-size: 22px; }
 
   .empty-state { text-align: center; padding: 40px; color: var(--muted); }
 
@@ -365,6 +488,10 @@
     margin-left: auto;
   }
 
+  .ended-actions {
+    display: flex; justify-content: center; margin-top: 20px;
+  }
+
   .api-section { margin-bottom: 24px; }
   .api-section h3 { font-size: 14px; color: var(--accent); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
@@ -390,6 +517,13 @@
     .decision-buttons { grid-template-columns: 1fr; }
     .stat-bar { gap: 12px; }
     header h1 { font-size: 18px; }
+    .run-chart { gap: 8px; }
+    .run-bar-column { min-width: 32px; }
+    .run-breakdown { padding: 18px; }
+    .modal-overlay { padding: 12px; }
+    .modal-card { padding: 18px; max-height: calc(100vh - 24px); }
+    .modal-header { flex-direction: column; }
+    .leaderboard-action-cell { text-align: left; }
   }
 </style>
 </head>
@@ -620,6 +754,9 @@ done</div>
     <div class="card" style="text-align:center;padding:40px">
       <h2 style="font-family:'Press Start 2P',monospace;font-size:24px;color:var(--deny);margin-bottom:12px">TIME'S UP!</h2>
       <p id="ended-summary-text" style="color:var(--muted);margin-bottom:24px">Your run is over. The Hall of Fame is below.</p>
+      <div class="ended-actions">
+        <button class="btn btn-primary" onclick="playAgain()">Play Again</button>
+      </div>
     </div>
     <div class="card">
       <h2 id="ended-leaderboard-title">Hall Of Fame</h2>
@@ -637,11 +774,25 @@ done</div>
   </div>
 </div>
 
+<div id="run-modal" class="modal-overlay" onclick="closeRunModalOnBackdrop(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2 id="run-modal-title">Run Breakdown</h2>
+        <p id="run-modal-subtitle">Inspect how a Hall of Fame run performed across speed and accuracy.</p>
+      </div>
+      <button class="btn btn-secondary modal-close" onclick="closeRunModal()">Close</button>
+    </div>
+    <div id="run-modal-body"></div>
+  </div>
+</div>
+
 <script>
 const API = '';
 const SESSION_STORAGE_KEY = 'return_desk_active_session';
 let sessionId = null;
 let sessionToken = null;
+let playerName = '';
 let currentCustomer = null;
 let streak = 0;
 let leaderboardInterval = null;
@@ -692,6 +843,16 @@ function authHeaders(extra = {}) {
     headers['X-Session-Token'] = sessionToken;
   }
   return headers;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
 }
 
 function copyToClipboard(value, buttonId, successText = 'Copied!') {
@@ -750,6 +911,7 @@ async function loadSavedSession() {
       return;
     }
 
+    playerName = data.name || playerName;
     sessionId = parsed.session_id;
     sessionToken = parsed.session_token;
     streak = 0;
@@ -771,6 +933,17 @@ function leaveRun() {
   clearInterval(countdownInterval);
   switchScreen('lobby');
   document.getElementById('customer-area').innerHTML = '';
+}
+
+async function playAgain() {
+  if (!playerName) {
+    leaveRun();
+    document.getElementById('player-name').focus();
+    return;
+  }
+  leaveRun();
+  document.getElementById('player-name').value = playerName;
+  await joinLobby();
 }
 
 function handleInvalidSessionAccess() {
@@ -825,6 +998,16 @@ function copyAgentToken() {
   copyToClipboard(sessionToken, 'copy-token-btn');
 }
 
+function closeRunModal() {
+  document.getElementById('run-modal').classList.remove('show');
+}
+
+function closeRunModalOnBackdrop(event) {
+  if (event.target.id === 'run-modal') {
+    closeRunModal();
+  }
+}
+
 async function switchToEnded() {
   if (currentScreen === 'ended') return;
 
@@ -838,6 +1021,11 @@ async function switchToEnded() {
   let html = '';
 
   if (stats) {
+    document.getElementById('ended-summary-text').textContent =
+      stats.total > 0
+        ? 'Your run is over. Review the breakdown, then see where you landed in the Hall of Fame.'
+        : 'Your run is over. Start another run and put a score on the board.';
+
     html += `
       <div class="done-card">
         <h2>RUN COMPLETE</h2>
@@ -861,11 +1049,202 @@ async function switchToEnded() {
         </div>
       </div>
     `;
+    html += renderRunBreakdown(stats);
   }
 
   html += await renderLeaderboard();
 
   document.getElementById('final-leaderboard').innerHTML = html;
+}
+
+function averageTurnTime(history) {
+  if (!history.length) return null;
+  return history.reduce((sum, item) => sum + item.time_taken, 0) / history.length;
+}
+
+function segmentAccuracy(history) {
+  if (!history.length) return null;
+  const correct = history.filter(item => item.correct).length;
+  return (correct / history.length) * 100;
+}
+
+function formatSeconds(seconds) {
+  if (seconds === null || seconds === undefined) return '—';
+  const digits = seconds >= 10 ? 1 : 2;
+  return `${seconds.toFixed(digits).replace(/\.0$/, '')}s`;
+}
+
+function buildRunInsights(stats, history) {
+  const insights = [];
+  const midpoint = Math.ceil(history.length / 2);
+  const firstHalf = history.slice(0, midpoint);
+  const secondHalf = history.slice(midpoint);
+  const firstHalfAvg = averageTurnTime(firstHalf);
+  const secondHalfAvg = averageTurnTime(secondHalf);
+  const firstHalfAccuracy = segmentAccuracy(firstHalf);
+  const secondHalfAccuracy = segmentAccuracy(secondHalf);
+
+  if (stats.accuracy < 65) {
+    insights.push('Accuracy was the main limiter on this run. Slow down slightly and re-check the rule order before you lock a decision.');
+  } else if (stats.avg_time > 12 && stats.accuracy >= 75) {
+    insights.push('You were accurate, but several turns ran long. A fixed scan order across the three files should lift your score.');
+  } else if (stats.accuracy >= 80 && stats.avg_time <= 8) {
+    insights.push('You kept a strong balance of speed and accuracy. The next gains are in trimming hesitation on the slowest turns.');
+  }
+
+  if (stats.slowest_time && stats.fastest_time && stats.slowest_time > stats.fastest_time * 2.2) {
+    insights.push('Your pacing swung a lot from turn to turn. Standardizing the order you inspect the files should smooth out the slow decisions.');
+  }
+
+  if (firstHalfAvg !== null && secondHalfAvg !== null) {
+    if (secondHalfAvg > firstHalfAvg * 1.15) {
+      insights.push('You slowed down in the back half of the run. A shorter late-run checklist would help preserve pace.');
+    } else if (secondHalfAvg < firstHalfAvg * 0.85) {
+      insights.push('You sped up after the opening turns. Starting with that later-run rhythm would buy more decisions.');
+    }
+  }
+
+  if (firstHalfAccuracy !== null && secondHalfAccuracy !== null) {
+    if (secondHalfAccuracy + 10 < firstHalfAccuracy) {
+      insights.push('Accuracy faded later in the run. A quick rule sanity check before submit could protect late-game points.');
+    } else if (secondHalfAccuracy > firstHalfAccuracy + 10) {
+      insights.push('Your reads improved as the run went on. A short warm-up pass through the rule order may help you hit that level sooner.');
+    }
+  }
+
+  if (!insights.length) {
+    insights.push('This run was fairly balanced. The biggest score gains now come from shaving time off the slowest turns without losing accuracy.');
+  }
+
+  return insights.slice(0, 3);
+}
+
+function renderRunBreakdown(stats, options = {}) {
+  const title = options.title || 'Run Breakdown';
+  const subtitle = options.subtitle || 'Green turns were correct. Taller bars took longer.';
+  const includeNote = options.includeNote !== false;
+  const history = Array.isArray(stats.decision_history) ? stats.decision_history : [];
+  if (!history.length) return '';
+
+  const maxTime = Math.max(...history.map(item => item.time_taken), 0.1);
+  const splitIndex = Math.max(1, Math.floor(history.length / 2));
+  const openingSegment = history.slice(0, splitIndex);
+  const closingSegment = history.slice(splitIndex);
+  const measuredClosingSegment = closingSegment.length ? closingSegment : history;
+  const finishAccuracy = segmentAccuracy(measuredClosingSegment);
+  const firstHalfAvg = averageTurnTime(openingSegment);
+  const secondHalfAvg = averageTurnTime(measuredClosingSegment);
+  let paceTrend = 'Steady';
+
+  if (firstHalfAvg !== null && secondHalfAvg !== null) {
+    if (secondHalfAvg > firstHalfAvg + 0.5) {
+      paceTrend = 'Slower late';
+    } else if (secondHalfAvg < firstHalfAvg - 0.5) {
+      paceTrend = 'Faster late';
+    }
+  }
+
+  const bars = history.map(item => {
+    const height = Math.max(24, Math.round((item.time_taken / maxTime) * 140));
+    return `
+      <div class="run-bar-column" title="Turn ${item.number}: ${item.correct ? 'Correct' : 'Incorrect'} in ${formatSeconds(item.time_taken)}">
+        <div class="run-bar-label">${formatSeconds(item.time_taken)}</div>
+        <div class="run-bar ${item.correct ? 'correct' : 'incorrect'}" style="height:${height}px"></div>
+        <div class="run-bar-caption">#${item.number}</div>
+      </div>
+    `;
+  }).join('');
+
+  const insights = buildRunInsights(stats, history)
+    .map(text => `<div class="run-insight">${text}</div>`)
+    .join('');
+
+  return `
+    <div class="run-breakdown">
+      <div class="run-breakdown-header">
+        <h3>${title}</h3>
+        <p>${subtitle}</p>
+      </div>
+      <div class="run-breakdown-metrics">
+        <div class="run-metric">
+          <div class="run-metric-label">Best Streak</div>
+          <div class="run-metric-value">${stats.best_streak || 0}</div>
+        </div>
+        <div class="run-metric">
+          <div class="run-metric-label">Fastest Turn</div>
+          <div class="run-metric-value">${formatSeconds(stats.fastest_time)}</div>
+        </div>
+        <div class="run-metric">
+          <div class="run-metric-label">Slowest Turn</div>
+          <div class="run-metric-value">${formatSeconds(stats.slowest_time)}</div>
+        </div>
+        <div class="run-metric">
+          <div class="run-metric-label">Finish Accuracy</div>
+          <div class="run-metric-value">${finishAccuracy === null ? '—' : `${finishAccuracy.toFixed(1).replace(/\.0$/, '')}%`}</div>
+        </div>
+        <div class="run-metric">
+          <div class="run-metric-label">Pace Trend</div>
+          <div class="run-metric-value">${paceTrend}</div>
+        </div>
+      </div>
+      <div class="run-chart">${bars}</div>
+      <div class="run-insights">${insights}</div>
+      ${includeNote ? `
+      <div class="run-note">
+        Turn time is currently measured end to end, from loading a customer to submitting the decision. It reflects your total pace, not isolated API or file-download latency yet.
+      </div>` : ''}
+    </div>
+  `;
+}
+
+async function openLeaderboardRun(sessionIdToView) {
+  const modal = document.getElementById('run-modal');
+  const title = document.getElementById('run-modal-title');
+  const subtitle = document.getElementById('run-modal-subtitle');
+  const body = document.getElementById('run-modal-body');
+
+  title.textContent = 'Run Breakdown';
+  subtitle.textContent = 'Inspect how a Hall of Fame run performed across speed and accuracy.';
+  body.innerHTML = '<div class="empty-state">Loading run breakdown...</div>';
+  modal.classList.add('show');
+
+  const res = await fetch(`${API}/api/leaderboard/${sessionIdToView}`);
+  if (!res.ok) {
+    const err = await readError(res);
+    body.innerHTML = `<div class="empty-state">${escapeHtml(err.detail || err.message || 'Unable to load this run.')}</div>`;
+    return;
+  }
+
+  const stats = await res.json();
+  title.textContent = `${stats.name}'s Run`;
+  subtitle.textContent = stats.rank
+    ? `Hall of Fame rank #${stats.rank} • ${stats.correct}/${stats.total} correct • ${stats.score.toFixed(1)} score`
+    : `${stats.correct}/${stats.total} correct • ${stats.score.toFixed(1)} score`;
+
+  body.innerHTML = `
+    <div class="modal-run-summary">
+      <div class="run-metric">
+        <div class="run-metric-label">Score</div>
+        <div class="run-metric-value">${stats.score.toFixed(1)}</div>
+      </div>
+      <div class="run-metric">
+        <div class="run-metric-label">Accuracy</div>
+        <div class="run-metric-value">${stats.accuracy}%</div>
+      </div>
+      <div class="run-metric">
+        <div class="run-metric-label">Avg Time</div>
+        <div class="run-metric-value">${stats.avg_time}s</div>
+      </div>
+      <div class="run-metric">
+        <div class="run-metric-label">Correct</div>
+        <div class="run-metric-value">${stats.correct}/${stats.total}</div>
+      </div>
+    </div>
+    ${renderRunBreakdown(stats, {
+      title: 'Performance Graph',
+      subtitle: 'Completed Hall of Fame runs can be opened from the leaderboard for a closer look.',
+    })}
+  `;
 }
 
 // ── Lobby ──
@@ -891,6 +1270,7 @@ async function joinLobby() {
   }
 
   const data = await res.json();
+  playerName = data.name;
   sessionId = data.session_id;
   sessionToken = data.agent_token;
   persistSession();
@@ -1084,20 +1464,25 @@ function buildLeaderboardTable(entries, options = {}) {
   }
 
   html += `<table class="leaderboard-table"><thead><tr>
-    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th>
+    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th><th>Run</th>
   </tr></thead><tbody>`;
 
   for (const e of entries) {
     const isYou = currentSessionId && e.session_id === currentSessionId;
     const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : e.rank;
     const rc = e.rank <= 3 ? `rank-${e.rank}` : '';
+    const safeName = escapeHtml(e.name);
+    const actionHtml = e.state === 'ended'
+      ? `<button class="leaderboard-action-btn" onclick="openLeaderboardRun('${e.session_id}')">View Run</button>`
+      : `<span class="leaderboard-action-note">In Progress</span>`;
     html += `<tr class="${isYou ? 'you' : ''}">
       <td class="${rc}">${medal}</td>
-      <td>${e.name}${isYou ? ' (you)' : ''}</td>
+      <td>${safeName}${isYou ? ' (you)' : ''}</td>
       <td>${e.correct}/${e.total}</td>
       <td>${e.accuracy}%</td>
       <td>${e.avg_time}s</td>
       <td style="font-weight:700">${e.score.toFixed(1)}</td>
+      <td class="leaderboard-action-cell">${actionHtml}</td>
     </tr>`;
   }
 
@@ -1125,6 +1510,10 @@ async function renderLeaderboard(options = {}) {
 // ── Keyboard ──
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeRunModal();
+  }
+
   if (currentScreen !== 'game' || !currentCustomer || submitting) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
