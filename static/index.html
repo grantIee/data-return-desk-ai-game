@@ -864,6 +864,7 @@ let streak = 0;
 let leaderboardInterval = null;
 let countdownInterval = null;
 let submitting = false;
+let loadingCustomer = false;
 let currentScreen = 'lobby';
 let runChartCounter = 0;
 
@@ -994,6 +995,8 @@ function leaveRun() {
   sessionToken = null;
   currentCustomer = null;
   streak = 0;
+  submitting = false;
+  loadingCustomer = false;
   updateStreak();
   clearPersistedSession();
   clearInterval(leaderboardInterval);
@@ -1063,6 +1066,31 @@ function copySessionId() {
 
 function copyAgentToken() {
   copyToClipboard(sessionToken, 'copy-token-btn');
+}
+
+function renderStats(data) {
+  document.getElementById('stat-score').textContent = data.score.toFixed(0);
+  document.getElementById('stat-correct').textContent = `${data.correct}/${data.total}`;
+  document.getElementById('stat-accuracy').textContent = data.total > 0 ? `${data.accuracy}%` : '—';
+  document.getElementById('stat-avg-time').textContent = data.total > 0 ? `${data.avg_time}s` : '—';
+}
+
+function renderCustomerMessage(message) {
+  document.getElementById('customer-area').innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
+}
+
+function expectedCustomerNumber(stats) {
+  return (stats.current_customer_index || 0) + 1;
+}
+
+async function syncCurrentCustomer(stats) {
+  if (currentScreen !== 'game' || submitting || loadingCustomer || !sessionId) return;
+  const expectedNumber = expectedCustomerNumber(stats);
+  if (currentCustomer && currentCustomer.number === expectedNumber) return;
+  if (currentCustomer) {
+    renderCustomerMessage('Run advanced in another client. Syncing the current customer...');
+  }
+  await loadNextCustomer();
 }
 
 function closeRunModal() {
@@ -1617,6 +1645,7 @@ async function joinLobby() {
 async function updateCountdown() {
   const stats = await fetchSession();
   if (!stats) return;
+  renderStats(stats);
 
   const el = document.getElementById('game-countdown');
   if (stats.state === 'ended') {
@@ -1630,11 +1659,15 @@ async function updateCountdown() {
   const secs = stats.remaining_seconds % 60;
   el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
   el.classList.toggle('urgent', stats.remaining_seconds < 300);
+  await syncCurrentCustomer(stats);
 }
 
 // ── Game ──
 
 async function loadNextCustomer() {
+  if (!sessionId || loadingCustomer) return;
+  loadingCustomer = true;
+
   try {
     const res = await fetch(`${API}/api/session/${sessionId}/next`, {
       headers: authHeaders(),
@@ -1651,7 +1684,9 @@ async function loadNextCustomer() {
       const err = await readError(res);
       if (err.error === 'session_ended') {
         switchToEnded();
+        return;
       }
+      renderCustomerMessage(err.message || err.detail || 'Unable to load the next customer.');
       return;
     }
 
@@ -1681,12 +1716,17 @@ async function loadNextCustomer() {
       </div>
       <div class="keyboard-hint"><kbd>Enter</kbd> Accept &nbsp;&nbsp; <kbd>Backspace</kbd> Deny</div>
     `;
-  } catch (e) {}
+  } catch (e) {
+    renderCustomerMessage('Unable to sync the current customer right now.');
+  } finally {
+    loadingCustomer = false;
+  }
 }
 
 async function submitDecision(decision) {
   if (!currentCustomer || submitting) return;
   submitting = true;
+  let queuedNextCustomer = false;
 
   try {
     const res = await fetch(`${API}/api/session/${sessionId}/decide`, {
@@ -1705,11 +1745,24 @@ async function submitDecision(decision) {
         return;
       }
       const err = await readError(res);
+      if (err.error === 'stale_customer') {
+        currentCustomer = null;
+        renderCustomerMessage('That customer was already processed. Syncing the current run...');
+        const stats = await fetchSession();
+        if (stats) {
+          renderStats(stats);
+          if (stats.state === 'ended') {
+            switchToEnded();
+          } else {
+            await syncCurrentCustomer(stats);
+          }
+        }
+        return;
+      }
       if (err.error === 'session_ended') {
         switchToEnded();
         return;
       }
-      submitting = false;
       return;
     }
 
@@ -1720,12 +1773,16 @@ async function submitDecision(decision) {
     await updateStats();
     await refreshGameLeaderboard();
 
+    queuedNextCustomer = true;
     setTimeout(() => {
       submitting = false;
       loadNextCustomer();
     }, 1200);
   } catch (e) {
-    submitting = false;
+  } finally {
+    if (!queuedNextCustomer) {
+      submitting = false;
+    }
   }
 }
 
@@ -1745,10 +1802,7 @@ function showFeedback(correct, explanation) {
 async function updateStats() {
   const data = await fetchSession();
   if (!data) return;
-  document.getElementById('stat-score').textContent = data.score.toFixed(0);
-  document.getElementById('stat-correct').textContent = `${data.correct}/${data.total}`;
-  document.getElementById('stat-accuracy').textContent = data.total > 0 ? `${data.accuracy}%` : '—';
-  document.getElementById('stat-avg-time').textContent = data.total > 0 ? `${data.avg_time}s` : '—';
+  renderStats(data);
 }
 
 function updateStreak() {
