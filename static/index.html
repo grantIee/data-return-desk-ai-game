@@ -318,7 +318,12 @@
   .rank-2 { color: var(--silver); font-weight: 600; }
   .rank-3 { color: var(--bronze); font-weight: 600; }
   .hall-intro { margin-bottom: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-  .leaderboard-action-cell { text-align: right; white-space: nowrap; }
+  .leaderboard-table th.leaderboard-action-header,
+  .leaderboard-action-cell {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+  }
 
   .leaderboard-action-btn {
     padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
@@ -582,6 +587,7 @@
     .modal-overlay { padding: 12px; }
     .modal-card { padding: 18px; max-height: calc(100vh - 24px); }
     .modal-header { flex-direction: column; }
+    .leaderboard-table th.leaderboard-action-header,
     .leaderboard-action-cell { text-align: left; }
   }
 </style>
@@ -1779,7 +1785,7 @@ function buildLeaderboardTable(entries, options = {}) {
   }
 
   html += `<table class="leaderboard-table"><thead><tr>
-    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th><th>Run</th>
+    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th><th class="leaderboard-action-header">Run</th>
   </tr></thead><tbody>`;
 
   for (const e of entries) {
