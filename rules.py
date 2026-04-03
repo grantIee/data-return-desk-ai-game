@@ -9,7 +9,7 @@ Each one comes with a receipt PDF, a transaction spreadsheet, and a fraud report
 What Needs To Be Done:
 Decide ACCEPT or DENY for each customer before time runs out.
 Move fast, but follow the rule order exactly because the first matching rule wins.
-Loyalty tier is hidden from the 3 files and may require a separate lookup by customer_id.
+Loyalty tier is hidden from the 3 files and lives in BigQuery, so agents that want Rule 2 need a separate lookup by customer_id via Gestalt.
 """.strip()
 
 

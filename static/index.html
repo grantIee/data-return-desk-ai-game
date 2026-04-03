@@ -800,7 +800,7 @@ while true; do
   # - receipt.pdf: is there a customer photo?
   # - tx.xlsx: calculate return_rate and return_dollar_ratio
   # - fraud.pptx: find the assessment slide
-  # - loyalty tier is not in the files; look it up separately if you want Rule 2
+  # - loyalty tier is not in the files; fetch it from BigQuery via Gestalt if you want Rule 2
   # - Apply rules 1-6 in order and stop at the first match
 
   DECISION="ACCEPT"  # or "DENY"
