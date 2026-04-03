@@ -93,6 +93,7 @@ For Vercel builds, `build.py` generates the dataset during the build if `generat
 - Vercel uses Upstash/Vercel Redis automatically if either of these env var pairs is present:
   - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
   - `KV_REST_API_URL` + `KV_REST_API_TOKEN`
+- If Redis is not configured on Vercel, the app falls back to a temporary file in `/tmp` so the function can boot, but that storage is not durable across cold starts or instances.
 
 Session updates are atomic through the storage layer so browser + bot traffic does not corrupt the same run.
 

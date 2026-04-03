@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import threading
 import time
 import urllib.error
@@ -12,7 +13,7 @@ from typing import Callable
 
 from models import GameMode, Session
 
-DEFAULT_SESSION_STORE_PATH = Path(".data/session_store.json")
+LOCAL_SESSION_STORE_PATH = Path(".data/session_store.json")
 
 
 class StoreError(RuntimeError):
@@ -66,12 +67,14 @@ class SessionStore(ABC):
 
 
 class JsonFileSessionStore(SessionStore):
-    backend_name = "json-file"
-
     def __init__(self, file_path: Path):
         self.file_path = file_path
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self.backend_name = "json-file"
+
+        if str(self.file_path).startswith("/tmp/"):
+            self.backend_name = "tmp-json-file"
 
     def _read_payload(self) -> dict:
         if not self.file_path.exists():
@@ -346,5 +349,9 @@ def create_session_store() -> SessionStore:
     if redis_url and redis_token:
         return UpstashRedisSessionStore(url=redis_url, token=redis_token, namespace=namespace)
 
-    store_path = Path(os.environ.get("SESSION_STORE_PATH", DEFAULT_SESSION_STORE_PATH))
+    default_path = LOCAL_SESSION_STORE_PATH
+    if os.environ.get("VERCEL"):
+        default_path = Path(tempfile.gettempdir()) / "return-desk-session-store.json"
+
+    store_path = Path(os.environ.get("SESSION_STORE_PATH", str(default_path)))
     return JsonFileSessionStore(store_path)
