@@ -361,13 +361,8 @@
     min-width: 90px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
   }
 
-  .resume-actions {
-    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;
-  }
-
-  .resume-actions .btn {
-    flex: 1;
-    min-width: 220px;
+  .session-actions {
+    margin-left: auto;
   }
 
   .api-section { margin-bottom: 24px; }
@@ -408,22 +403,13 @@
 <div class="container">
   <!-- ════════════ LOBBY SCREEN ════════════ -->
   <div id="screen-lobby" class="screen active">
-    <div class="card" id="resume-card" style="display:none">
-      <h2>Resume Run</h2>
-      <div class="help-text" id="resume-copy">You have an active run saved in this browser.</div>
-      <div class="resume-actions">
-        <button class="btn btn-primary" onclick="resumeSavedRun()">Resume Active Run</button>
-        <button class="btn btn-secondary" onclick="discardSavedRun()">Start New Run Instead</button>
-      </div>
-    </div>
-
     <div class="card" id="join-card">
       <h2>Start a Run</h2>
       <div class="input-group">
         <label>Your Name</label>
         <input type="text" id="player-name" placeholder="Enter your name..." autofocus>
       </div>
-      <div class="help-text">Every run is solo. Your score goes onto the shared Hall of Fame.</div>
+      <div class="help-text">Every run is solo. Your score goes onto the shared Hall of Fame. Refreshing the page will resume your active run automatically.</div>
       <button class="btn btn-primary" id="join-btn" onclick="joinLobby()">Start Run</button>
     </div>
 
@@ -457,7 +443,10 @@
           <code id="agent-token-display">hidden</code>
           <button id="copy-token-btn" class="btn-copy" onclick="copyAgentToken()">Copy Token</button>
         </div>
-        <span id="session-mode-label" style="font-size:11px">Use your session ID and agent token in the API tab to build an agent that plays for you</span>
+        <div class="credential-row">
+          <span id="session-mode-label" style="font-size:11px">Use your session ID and agent token in the API tab to build an agent that plays for you</span>
+          <button class="btn btn-secondary session-actions" onclick="leaveRun()">Leave Run</button>
+        </div>
       </div>
     </div>
 
@@ -659,7 +648,6 @@ let leaderboardInterval = null;
 let countdownInterval = null;
 let submitting = false;
 let currentScreen = 'lobby';
-let savedSession = null;
 
 // ── Init ──
 
@@ -690,6 +678,8 @@ async function fetchSession() {
   if (!res.ok) {
     if (res.status === 401) {
       handleInvalidSessionAccess();
+    } else if (res.status === 404) {
+      handleMissingSession();
     }
     return null;
   }
@@ -731,17 +721,8 @@ function persistSession() {
   }));
 }
 
-function hideResumeCard() {
-  const card = document.getElementById('resume-card');
-  if (card) {
-    card.style.display = 'none';
-  }
-}
-
 function clearPersistedSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
-  savedSession = null;
-  hideResumeCard();
 }
 
 async function loadSavedSession() {
@@ -769,46 +750,39 @@ async function loadSavedSession() {
       return;
     }
 
-    savedSession = {
-      sessionId: parsed.session_id,
-      sessionToken: parsed.session_token,
-      summary: data,
-    };
-
-    document.getElementById('resume-copy').textContent =
-      `Resume ${data.name}'s active run with ${data.correct}/${data.total} correct and ${data.remaining_minutes} minutes left.`;
-    document.getElementById('resume-card').style.display = 'block';
+    sessionId = parsed.session_id;
+    sessionToken = parsed.session_token;
+    streak = 0;
+    updateStreak();
+    switchToGame();
   } catch (e) {
     clearPersistedSession();
   }
 }
 
-function resumeSavedRun() {
-  if (!savedSession) return;
-  sessionId = savedSession.sessionId;
-  sessionToken = savedSession.sessionToken;
-  streak = 0;
-  updateStreak();
-  switchToGame();
-}
-
-function discardSavedRun() {
-  sessionId = null;
-  sessionToken = null;
-  clearPersistedSession();
-}
-
-function handleInvalidSessionAccess() {
-  if (!sessionId && !sessionToken) return;
+function leaveRun() {
   sessionId = null;
   sessionToken = null;
   currentCustomer = null;
+  streak = 0;
+  updateStreak();
   clearPersistedSession();
   clearInterval(leaderboardInterval);
   clearInterval(countdownInterval);
   switchScreen('lobby');
   document.getElementById('customer-area').innerHTML = '';
+}
+
+function handleInvalidSessionAccess() {
+  if (!sessionId && !sessionToken) return;
+  leaveRun();
   alert('This run is no longer accessible from this browser. Start a new run to continue.');
+}
+
+function handleMissingSession() {
+  if (!sessionId) return;
+  leaveRun();
+  alert('This run could not be found. On Vercel, this usually means durable Redis storage is not configured or the run was reset.');
 }
 
 // ── Screen switching ──
@@ -831,7 +805,6 @@ function switchToGame() {
   document.getElementById('session-id-display').textContent = sessionId;
   document.getElementById('agent-token-display').textContent = maskToken(sessionToken);
   updateSessionModeLabel();
-  hideResumeCard();
 
   clearInterval(leaderboardInterval);
   clearInterval(countdownInterval);
@@ -921,8 +894,6 @@ async function joinLobby() {
   sessionId = data.session_id;
   sessionToken = data.agent_token;
   persistSession();
-  hideResumeCard();
-  savedSession = null;
   streak = 0;
   updateStreak();
   switchToGame();
@@ -958,6 +929,10 @@ async function loadNextCustomer() {
     if (!res.ok) {
       if (res.status === 401) {
         handleInvalidSessionAccess();
+        return;
+      }
+      if (res.status === 404) {
+        handleMissingSession();
         return;
       }
       const err = await readError(res);
@@ -1010,6 +985,10 @@ async function submitDecision(decision) {
     if (!res.ok) {
       if (res.status === 401) {
         handleInvalidSessionAccess();
+        return;
+      }
+      if (res.status === 404) {
+        handleMissingSession();
         return;
       }
       const err = await readError(res);

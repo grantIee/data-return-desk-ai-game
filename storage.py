@@ -334,8 +334,21 @@ def create_session_store() -> SessionStore:
     if redis_url and redis_token:
         return UpstashRedisSessionStore(url=redis_url, token=redis_token, namespace=namespace)
 
+    allow_ephemeral = os.environ.get("ALLOW_EPHEMERAL_SESSION_STORE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     default_path = LOCAL_SESSION_STORE_PATH
     if os.environ.get("VERCEL"):
+        if not allow_ephemeral:
+            raise StoreError(
+                "Redis-backed session storage is required on Vercel. "
+                "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN "
+                "(or KV_REST_API_URL and KV_REST_API_TOKEN). "
+                "If you intentionally want non-durable testing storage, set "
+                "ALLOW_EPHEMERAL_SESSION_STORE=1."
+            )
         default_path = Path(tempfile.gettempdir()) / "return-desk-session-store.json"
 
     store_path = Path(os.environ.get("SESSION_STORE_PATH", str(default_path)))
