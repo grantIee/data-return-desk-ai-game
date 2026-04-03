@@ -14,9 +14,10 @@ Open `http://localhost:8888` to play.
 ## Modes
 
 - `Single Player` starts a private run immediately.
+- Solo runs also feed a persistent Hall of Fame leaderboard.
 - `Async Multiplayer` puts you into a named challenge. Anyone using the same `challenge code` shares the same leaderboard, even if they play at different times.
 
-Each session gets its own timer. The 30-minute clock starts when that session loads its first customer, not when the server starts.
+Each session gets its own timer. The 20-minute clock starts when that session loads its first customer, not when the server starts.
 
 ## How to Play
 

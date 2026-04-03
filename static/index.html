@@ -300,6 +300,7 @@
   .rank-1 { color: var(--gold); font-weight: 700; }
   .rank-2 { color: var(--silver); font-weight: 600; }
   .rank-3 { color: var(--bronze); font-weight: 600; }
+  .hall-intro { margin-bottom: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
   /* ── Tabs ── */
 
@@ -410,6 +411,12 @@
       <h2>Decision Rules</h2>
       <div class="rules-box" id="rules-display">Loading rules...</div>
     </div>
+
+    <div class="card">
+      <h2>Solo Hall Of Fame</h2>
+      <div class="hall-intro">Best single-player runs across everyone who has played solo.</div>
+      <div id="lobby-hall-of-fame">Loading hall of fame...</div>
+    </div>
   </div>
 
   <!-- ════════════ GAME SCREEN ════════════ -->
@@ -461,7 +468,7 @@
 
     <!-- Leaderboard Tab -->
     <div id="tab-leaderboard" class="game-tab" style="display:none">
-      <div class="card"><h2>Leaderboard</h2><div id="game-leaderboard"></div></div>
+      <div class="card"><h2 id="game-leaderboard-title">Leaderboard</h2><div id="game-leaderboard"></div></div>
     </div>
 
     <!-- Rules Tab -->
@@ -592,10 +599,10 @@ done</div>
   <div id="screen-ended" class="screen">
     <div class="card" style="text-align:center;padding:40px">
       <h2 style="font-family:'Press Start 2P',monospace;font-size:24px;color:var(--deny);margin-bottom:12px">TIME'S UP!</h2>
-      <p style="color:var(--muted);margin-bottom:24px">The game has ended. Final standings below.</p>
+      <p id="ended-summary-text" style="color:var(--muted);margin-bottom:24px">The game has ended. Final standings below.</p>
     </div>
     <div class="card">
-      <h2>Final Leaderboard</h2>
+      <h2 id="ended-leaderboard-title">Final Leaderboard</h2>
       <div id="final-leaderboard"></div>
     </div>
   </div>
@@ -649,6 +656,8 @@ async function init() {
 
   document.getElementById('game-mode').addEventListener('change', syncModeFields);
   syncModeFields();
+  refreshLobbyHallOfFame();
+  setInterval(refreshLobbyHallOfFame, 15000);
 }
 
 function syncModeFields() {
@@ -716,12 +725,32 @@ function updateSessionModeLabel() {
   }
 }
 
+function updateLeaderboardLabels() {
+  const gameTitle = document.getElementById('game-leaderboard-title');
+  const endedTitle = document.getElementById('ended-leaderboard-title');
+  const tabButton = document.getElementById('tab-button-leaderboard');
+  const endedSummary = document.getElementById('ended-summary-text');
+
+  if (sessionMode === 'single') {
+    gameTitle.textContent = 'Solo Hall Of Fame';
+    endedTitle.textContent = 'Solo Hall Of Fame';
+    tabButton.textContent = 'Hall Of Fame';
+    endedSummary.textContent = 'Your run is over. The solo hall of fame is below.';
+  } else {
+    gameTitle.textContent = 'Leaderboard';
+    endedTitle.textContent = 'Final Leaderboard';
+    tabButton.textContent = 'Leaderboard';
+    endedSummary.textContent = 'The game has ended. Final standings below.';
+  }
+}
+
 function switchToGame() {
   switchScreen('game');
   document.getElementById('game-rules-display').textContent =
     document.getElementById('rules-display').textContent;
   document.getElementById('session-id-display').textContent = sessionId;
   updateSessionModeLabel();
+  updateLeaderboardLabels();
   updateShareLink();
 
   clearInterval(leaderboardInterval);
@@ -748,6 +777,7 @@ async function switchToEnded() {
   if (currentScreen === 'ended') return;
 
   switchScreen('ended');
+  updateLeaderboardLabels();
   clearInterval(leaderboardInterval);
   clearInterval(countdownInterval);
   currentCustomer = null;
@@ -781,11 +811,7 @@ async function switchToEnded() {
     `;
   }
 
-  if (sessionMode === 'multiplayer') {
-    html += await renderLeaderboard();
-  } else {
-    html += '<div class="empty-state">Single-player runs are tracked only for your current session.</div>';
-  }
+  html += await renderLeaderboard();
 
   document.getElementById('final-leaderboard').innerHTML = html;
 }
@@ -977,28 +1003,31 @@ async function refreshGameLeaderboard() {
   document.getElementById('game-leaderboard').innerHTML = await renderLeaderboard();
 }
 
-async function renderLeaderboard() {
-  if (sessionMode !== 'multiplayer') {
-    return '<div class="empty-state">Single-player runs do not participate in a shared leaderboard.</div>';
-  }
-
-  const params = new URLSearchParams({
-    mode: 'multiplayer',
-    challenge_code: challengeCode || defaultChallengeCode,
+async function refreshLobbyHallOfFame() {
+  const el = document.getElementById('lobby-hall-of-fame');
+  if (!el) return;
+  el.innerHTML = await renderLeaderboard({
+    mode: 'single',
+    title: false,
+    limit: 10,
+    emptyMessage: 'No solo runs yet. Start one and set the first score.',
   });
-  const res = await fetch(`${API}/api/leaderboard?${params.toString()}`);
-  const data = await res.json();
-  if (data.length === 0) {
-    return `<div class="empty-state">No scores yet for challenge <strong>${challengeCode}</strong>.</div>`;
+}
+
+function buildLeaderboardTable(entries, options = {}) {
+  const { title, currentSessionId } = options;
+
+  let html = '';
+  if (title) {
+    html += `<div class="help-text" style="margin-bottom:12px">${title}</div>`;
   }
 
-  let html = `<div class="help-text" style="margin-bottom:12px">Challenge <strong>${challengeCode}</strong></div>`;
   html += `<table class="leaderboard-table"><thead><tr>
     <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th>
   </tr></thead><tbody>`;
 
-  for (const e of data) {
-    const isYou = e.session_id === sessionId;
+  for (const e of entries) {
+    const isYou = currentSessionId && e.session_id === currentSessionId;
     const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : e.rank;
     const rc = e.rank <= 3 ? `rank-${e.rank}` : '';
     html += `<tr class="${isYou ? 'you' : ''}">
@@ -1010,7 +1039,41 @@ async function renderLeaderboard() {
       <td style="font-weight:700">${e.score.toFixed(1)}</td>
     </tr>`;
   }
+
   return html + '</tbody></table>';
+}
+
+async function renderLeaderboard(options = {}) {
+  const mode = options.mode || sessionMode;
+  const limit = options.limit || null;
+  let emptyMessage = options.emptyMessage || 'No scores yet.';
+  const title = options.title === undefined ? true : options.title;
+  const params = new URLSearchParams({ mode });
+
+  if (mode === 'multiplayer') {
+    params.set('challenge_code', challengeCode || defaultChallengeCode);
+    emptyMessage = options.emptyMessage || `No scores yet for challenge <strong>${challengeCode}</strong>.`;
+  }
+
+  const res = await fetch(`${API}/api/leaderboard?${params.toString()}`);
+  const data = await res.json();
+  const entries = limit ? data.slice(0, limit) : data;
+
+  if (entries.length === 0) {
+    return `<div class="empty-state">${emptyMessage}</div>`;
+  }
+
+  if (mode === 'single') {
+    return buildLeaderboardTable(entries, {
+      title: title ? 'Best solo runs across the return desk.' : '',
+      currentSessionId: sessionId,
+    });
+  }
+
+  return buildLeaderboardTable(entries, {
+    title: title ? `Challenge <strong>${challengeCode}</strong>` : '',
+    currentSessionId: sessionId,
+  });
 }
 
 // ── Keyboard ──

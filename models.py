@@ -76,7 +76,7 @@ class Session(BaseModel):
     mode: GameMode = GameMode.MULTI_PLAYER
     challenge_code: Optional[str] = None
     created_at: float = Field(default_factory=time.time)
-    duration_minutes: int = 30
+    duration_minutes: int = 20
     started_at: Optional[float] = None
     expires_at: Optional[float] = None
     decisions: list[SessionDecision] = Field(default_factory=list)

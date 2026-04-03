@@ -28,7 +28,7 @@ from storage import SessionStore, create_session_store
 
 # ── Configuration ──
 DEFAULT_CUSTOMER_COUNT = int(os.environ.get("CUSTOMER_COUNT", "500"))
-SESSION_DURATION_MINUTES = int(os.environ.get("GAME_DURATION", "30"))
+SESSION_DURATION_MINUTES = int(os.environ.get("GAME_DURATION", "20"))
 DEFAULT_CHALLENGE_CODE = os.environ.get("DEFAULT_CHALLENGE_CODE", "main")
 ADMIN_CODE = os.environ.get("ADMIN_CODE")
 
