@@ -802,7 +802,7 @@ while true; do
   curl -s $BASE/api/files/$CID/transactions.xlsx -o tx.xlsx
   curl -s $BASE/api/files/$CID/fraud_report.pptx -o fraud.pptx
 
-  # TODO: Analyze files and determine ACCEPT or DENY
+  # TODO: Read the rules below, analyze the files, and determine ACCEPT or DENY
   # - receipt.pdf: is there a customer photo?
   # - tx.xlsx: calculate return_rate and return_dollar_ratio
   # - fraud.pptx: find the assessment slide

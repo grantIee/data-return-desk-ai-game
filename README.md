@@ -38,9 +38,10 @@ What is happening:
 
 What needs to be done:
 
-- Decide `ACCEPT` or `DENY` for each customer before time runs out.
+- Read the decision rules below, then decide `ACCEPT` or `DENY` for each customer before time runs out.
+- Use the receipt PDF, transaction spreadsheet, and fraud report deck to evaluate each case.
+- If you want to apply Rule 2, fetch the customer's loyalty tier from BigQuery by `customer_id` via Gestalt.
 - Move fast, but follow the rule order exactly because the first matching rule wins.
-- Loyalty tier is hidden from the 3 files and lives in BigQuery, so agents that want Rule 2 need a separate lookup by `customer_id` via Gestalt.
 
 ## Decision Rules
 
