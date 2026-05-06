@@ -29,6 +29,7 @@ from storage import SessionStore, create_session_store
 # ── Configuration ──
 DEFAULT_CUSTOMER_COUNT = int(os.environ.get("CUSTOMER_COUNT", "500"))
 SESSION_DURATION_MINUTES = int(os.environ.get("GAME_DURATION", "20"))
+DECK_SIZE = int(os.environ.get("DECK_SIZE", "100"))
 ADMIN_CODE = os.environ.get("ADMIN_CODE")
 
 app = FastAPI(title="The Return Desk")
@@ -111,9 +112,17 @@ def get_session_state(session: Session, now: float | None = None) -> str:
     now = now or time.time()
     if session.started_at is None:
         return "ready"
-    if session.is_expired(now):
+    if session.is_expired(now) or session.is_complete:
         return "ended"
     return "active"
+
+
+def session_total_customers(session: Session) -> int:
+    if session.customer_indices:
+        return len(session.customer_indices)
+    if customers:
+        return min(DECK_SIZE, len(customers))
+    return DECK_SIZE
 
 
 def build_decision_history(session: Session) -> list[dict[str, Any]]:
@@ -175,6 +184,7 @@ def session_summary(session: Session, now: float | None = None) -> dict:
         "score": round(session.score, 1),
         "elapsed": round(max(0.0, now - elapsed_from), 1),
         "current_customer_index": session.current_customer_index,
+        "total_customers": session_total_customers(session),
         "best_streak": best_correct_streak(session),
         "fastest_time": round(min(times), 2) if times else None,
         "slowest_time": round(max(times), 2) if times else None,
@@ -184,8 +194,12 @@ def session_summary(session: Session, now: float | None = None) -> dict:
 
 def build_leaderboard_entries() -> list[dict[str, Any]]:
     entries = []
-    for session in session_store.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None):
+    for session in session_store.list_top_sessions(limit=100):
         if session.total_count == 0:
+            continue
+
+        deck_len = len(session.customer_indices) or DECK_SIZE
+        if session.total_count > deck_len:
             continue
 
         entries.append(
@@ -209,19 +223,29 @@ def build_leaderboard_entries() -> list[dict[str, Any]]:
     return entries
 
 
-def current_customer_for_session(session: Session) -> Customer:
+def current_customer_for_session(session: Session) -> Customer | None:
     if not customers:
         raise HTTPException(status_code=500, detail="Customer pool is empty")
-    idx = session.current_customer_index % len(customers)
-    return customers[idx]
+
+    if not session.customer_indices or session.is_complete:
+        return None
+
+    pool_index = session.customer_indices[session.current_customer_index]
+    return customers[pool_index]
 
 
 def _touch_current_customer(session: Session, now: float) -> Session:
     session.ensure_started(now)
+    session.ensure_deck(pool_size=len(customers), deck_size=DECK_SIZE)
     if session.is_expired(now):
         return session
 
     customer = current_customer_for_session(session)
+    if customer is None:
+        session.current_customer_id = None
+        session.current_customer_started_at = None
+        return session
+
     if session.current_customer_id != customer.id or session.current_customer_started_at is None:
         session.current_customer_id = customer.id
         session.current_customer_started_at = now
@@ -243,6 +267,7 @@ async def startup():
     print("=" * 50)
     print(f"Loaded {len(customers)} customers ({accept} ACCEPT, {deny} DENY)")
     print(f"Session duration: {SESSION_DURATION_MINUTES} minutes")
+    print(f"Deck size: {DECK_SIZE}")
     print(f"Session store: {session_store.backend_name}")
     print(f"Admin code: {admin_code}")
     print(f"Local: http://localhost:8888")
@@ -319,6 +344,7 @@ async def create_session(req: SessionCreate):
         agent_token_hash=agent_token_hash,
         duration_minutes=SESSION_DURATION_MINUTES,
     )
+    session.ensure_deck(pool_size=len(customers), deck_size=DECK_SIZE)
     session_store.save_session(session)
 
     print(f"  -> Session created: {session.name} ({session.id}) [single]")
@@ -351,7 +377,11 @@ async def get_next_customer(session_id: str, request: Request):
     if session.is_expired(now):
         return error_response(403, "session_ended", "This run has ended. Check your final score.")
 
+    if session.is_complete:
+        return error_response(403, "session_ended", "Run complete. Every customer in your deck has been processed.")
+
     customer = current_customer_for_session(session)
+    assert customer is not None
 
     return {
         "done": False,
@@ -360,7 +390,7 @@ async def get_next_customer(session_id: str, request: Request):
         "customer_id": customer.id,
         "customer_name": customer.name,
         "number": session.current_customer_index + 1,
-        "total_customers": len(customers),
+        "total_customers": session_total_customers(session),
         "files": {
             "receipt": f"/api/files/{customer.id}/receipt.pdf",
             "transactions": f"/api/files/{customer.id}/transactions.xlsx",
@@ -412,6 +442,7 @@ async def submit_decision(session_id: str, req: DecisionRequest, request: Reques
     def apply_decision(existing: Session) -> Session | None:
         nonlocal response_payload
         existing.ensure_started(now)
+        existing.ensure_deck(pool_size=len(customers), deck_size=DECK_SIZE)
 
         if existing.is_expired(now):
             response_payload = {
@@ -424,7 +455,20 @@ async def submit_decision(session_id: str, req: DecisionRequest, request: Reques
             }
             return existing
 
+        if existing.is_complete:
+            response_payload = {
+                "type": "error",
+                "response": error_response(
+                    403,
+                    "session_ended",
+                    "Run complete. Every customer in your deck has been processed.",
+                ),
+            }
+            return existing
+
         customer = current_customer_for_session(existing)
+        assert customer is not None
+
         if req.customer_id != customer.id:
             response_payload = {
                 "type": "error",
