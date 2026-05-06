@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import time
 from enum import Enum
 from typing import Optional
@@ -79,6 +80,7 @@ class Session(BaseModel):
     started_at: Optional[float] = None
     expires_at: Optional[float] = None
     decisions: list[SessionDecision] = Field(default_factory=list)
+    customer_indices: list[int] = Field(default_factory=list)
     current_customer_index: int = 0
     current_customer_id: Optional[str] = None
     current_customer_started_at: Optional[float] = None
@@ -104,11 +106,28 @@ class Session(BaseModel):
         now = now or time.time()
         return max(0, int(self.expires_at - now))
 
+    def ensure_deck(self, pool_size: int, deck_size: int) -> None:
+        if self.customer_indices:
+            return
+        if pool_size <= 0 or deck_size <= 0:
+            return
+
+        rng = random.Random(self.id)
+        n = min(deck_size, pool_size)
+        self.customer_indices = rng.sample(range(pool_size), n)
+
+    @property
+    def is_complete(self) -> bool:
+        return (
+            len(self.customer_indices) > 0
+            and self.current_customer_index >= len(self.customer_indices)
+        )
+
     @property
     def state(self) -> str:
         if self.started_at is None:
             return "ready"
-        if self.is_expired():
+        if self.is_expired() or self.is_complete:
             return "ended"
         return "active"
 

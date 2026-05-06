@@ -50,6 +50,14 @@ class SessionStore(ABC):
     def reset(self) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def update_leaderboard_score(self, session: Session) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_top_sessions(self, limit: int = 100) -> list[Session]:
+        raise NotImplementedError
+
 
 class JsonFileSessionStore(SessionStore):
     def __init__(self, file_path: Path):
@@ -104,12 +112,15 @@ class JsonFileSessionStore(SessionStore):
                 return None
 
             current = self._deserialize_session(raw)
+            previous_total_count = current.total_count
             updated = mutator(current)
             if updated is None:
                 return None
 
             payload.setdefault("sessions", {})[session_id] = self._serialize_session(updated)
             self._write_payload(payload)
+            if updated.total_count > previous_total_count:
+                self.update_leaderboard_score(updated)
             return updated
 
     def list_sessions(
@@ -133,6 +144,18 @@ class JsonFileSessionStore(SessionStore):
         with self._lock:
             self._write_payload({"sessions": {}})
 
+    def update_leaderboard_score(self, session: Session) -> None:
+        return
+
+    def list_top_sessions(self, limit: int = 100) -> list[Session]:
+        sessions = self.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None)
+        scored = [session for session in sessions if session.total_count > 0]
+        scored.sort(
+            key=lambda session: (session.score, session.correct_count, -session.avg_time),
+            reverse=True,
+        )
+        return scored[:limit]
+
 
 class UpstashRedisSessionStore(SessionStore):
     backend_name = "upstash-redis"
@@ -150,6 +173,10 @@ class UpstashRedisSessionStore(SessionStore):
     @property
     def _challenges_key(self) -> str:
         return f"{self.namespace}:challenges"
+
+    @property
+    def _leaderboard_key(self) -> str:
+        return f"{self.namespace}:leaderboard"
 
     def _session_key(self, session_id: str) -> str:
         return f"{self.namespace}:session:{session_id}"
@@ -276,11 +303,14 @@ class UpstashRedisSessionStore(SessionStore):
             if current is None:
                 return None
 
+            previous_total_count = current.total_count
             updated = mutator(current)
             if updated is None:
                 return None
 
             self.save_session(updated)
+            if updated.total_count > previous_total_count:
+                self.update_leaderboard_score(updated)
             return updated
         finally:
             self._release_lock(session_id, owner)
@@ -313,11 +343,37 @@ class UpstashRedisSessionStore(SessionStore):
         session_ids = self._command(["SMEMBERS", self._sessions_key]) or []
         challenge_codes = self._command(["SMEMBERS", self._challenges_key]) or []
 
-        keys = [self._sessions_key, self._challenges_key]
+        keys = [self._sessions_key, self._challenges_key, self._leaderboard_key]
         keys.extend(self._session_key(session_id) for session_id in session_ids)
         keys.extend(self._challenge_key(challenge_code) for challenge_code in challenge_codes)
         if keys:
             self._command(["DEL", *keys])
+
+    def update_leaderboard_score(self, session: Session) -> None:
+        if session.mode != GameMode.SINGLE_PLAYER:
+            return
+        if session.total_count == 0:
+            return
+
+        self._pipeline(
+            [
+                ["ZADD", self._leaderboard_key, session.score, session.id],
+                ["ZREMRANGEBYRANK", self._leaderboard_key, 0, -101],
+            ]
+        )
+
+    def list_top_sessions(self, limit: int = 100) -> list[Session]:
+        member_ids = self._command(["ZREVRANGE", self._leaderboard_key, 0, max(0, limit - 1)]) or []
+        if not member_ids:
+            return []
+
+        commands = [["GET", self._session_key(session_id)] for session_id in member_ids]
+        results = self._pipeline(commands)
+        return [
+            session
+            for session in (self._deserialize_session(raw) for raw in results)
+            if session is not None
+        ]
 
 
 def create_session_store() -> SessionStore:
