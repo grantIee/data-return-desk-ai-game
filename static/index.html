@@ -862,17 +862,56 @@ done</div>
 <script>
 const API = '';
 const SESSION_STORAGE_KEY = 'return_desk_active_session';
+const LOBBY_LEADERBOARD_POLL_MS = 15000;
+const GAME_LEADERBOARD_POLL_MS = 30000;
+const COUNTDOWN_POLL_MS = 5000;
 let sessionId = null;
 let sessionToken = null;
 let playerName = '';
 let currentCustomer = null;
 let streak = 0;
+let lobbyLeaderboardInterval = null;
 let leaderboardInterval = null;
 let countdownInterval = null;
 let submitting = false;
 let loadingCustomer = false;
 let currentScreen = 'lobby';
 let runChartCounter = 0;
+
+function isPageVisible() {
+  return document.visibilityState === 'visible';
+}
+
+function clearPollInterval(handle) {
+  if (handle) clearInterval(handle);
+  return null;
+}
+
+function stopAllPolling() {
+  lobbyLeaderboardInterval = clearPollInterval(lobbyLeaderboardInterval);
+  leaderboardInterval = clearPollInterval(leaderboardInterval);
+  countdownInterval = clearPollInterval(countdownInterval);
+}
+
+function refreshActivePolling() {
+  stopAllPolling();
+  if (!isPageVisible()) return;
+
+  if (currentScreen === 'lobby') {
+    refreshLobbyHallOfFame();
+    lobbyLeaderboardInterval = setInterval(refreshLobbyHallOfFame, LOBBY_LEADERBOARD_POLL_MS);
+    return;
+  }
+
+  if (currentScreen === 'game') {
+    updateCountdown();
+    refreshGameLeaderboard();
+    leaderboardInterval = setInterval(refreshGameLeaderboard, GAME_LEADERBOARD_POLL_MS);
+    countdownInterval = setInterval(updateCountdown, COUNTDOWN_POLL_MS);
+  }
+}
+
+document.addEventListener('visibilitychange', refreshActivePolling);
 
 // ── Init ──
 
@@ -884,8 +923,7 @@ async function init() {
   document.getElementById('rules-display').textContent = rulesData.rules;
   document.getElementById('api-base-url').textContent = window.location.origin;
   await loadSavedSession();
-  refreshLobbyHallOfFame();
-  setInterval(refreshLobbyHallOfFame, 15000);
+  refreshActivePolling();
 }
 
 function formatBriefing(text) {
@@ -1021,9 +1059,8 @@ function leaveRun() {
   loadingCustomer = false;
   updateStreak();
   clearPersistedSession();
-  clearInterval(leaderboardInterval);
-  clearInterval(countdownInterval);
   switchScreen('lobby');
+  refreshActivePolling();
   document.getElementById('customer-area').innerHTML = '';
 }
 
@@ -1073,14 +1110,8 @@ function switchToGame() {
   document.getElementById('agent-token-display').textContent = maskToken(sessionToken);
   updateSessionModeLabel();
 
-  clearInterval(leaderboardInterval);
-  clearInterval(countdownInterval);
-  leaderboardInterval = setInterval(refreshGameLeaderboard, 5000);
-  countdownInterval = setInterval(updateCountdown, 1000);
-
+  refreshActivePolling();
   updateStats();
-  updateCountdown();
-  refreshGameLeaderboard();
   loadNextCustomer();
 }
 
@@ -1132,8 +1163,7 @@ async function switchToEnded() {
 
   switchScreen('ended');
   clearPersistedSession();
-  clearInterval(leaderboardInterval);
-  clearInterval(countdownInterval);
+  stopAllPolling();
   currentCustomer = null;
 
   const stats = await fetchSession();
