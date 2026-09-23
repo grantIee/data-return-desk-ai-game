@@ -318,6 +318,12 @@
   .rank-2 { color: var(--silver); font-weight: 600; }
   .rank-3 { color: var(--bronze); font-weight: 600; }
   .hall-intro { margin-bottom: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .leaderboard-section { margin-top: 20px; }
+  .leaderboard-section:first-child { margin-top: 0; }
+  .leaderboard-section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); font-weight: 600; margin-bottom: 4px;
+  }
   .leaderboard-table th.leaderboard-action-header,
   .leaderboard-action-cell {
     width: 1%;
@@ -624,7 +630,7 @@
 
     <div class="card">
       <h2>Solo Hall Of Fame</h2>
-      <div class="hall-intro">Best single-player runs across everyone who has played solo.</div>
+      <div class="hall-intro">All-time records, plus this week's best — or the most recent runs if the week is quiet.</div>
       <div id="lobby-hall-of-fame">Loading hall of fame...</div>
     </div>
   </div>
@@ -775,7 +781,7 @@
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/leaderboard</div>
-            <div class="api-desc">Hall of Fame rankings. Score = correct × (100 / avg_seconds).</div>
+            <div class="api-desc">Hall of Fame: all-time top 3 plus up to 7 recent runs (this week by score, then older by recency). Score = correct × (100 / avg_seconds).</div>
           </div>
           <div class="api-endpoint">
             <div class="api-method"><span class="method method-get">GET</span>/api/time</div>
@@ -1542,8 +1548,15 @@ async function openLeaderboardRun(sessionIdToView) {
 
   const stats = await res.json();
   title.textContent = `${stats.name}'s Run`;
+  const sectionLabel = stats.section === 'record'
+    ? 'All-time records'
+    : stats.in_week
+      ? 'This week'
+      : (stats.section === 'recent' || stats.section === 'weekly')
+        ? 'Recent'
+        : 'Hall of Fame';
   subtitle.textContent = stats.rank
-    ? `Hall of Fame rank #${stats.rank} • ${stats.correct}/${stats.total} correct • ${stats.score.toFixed(1)} score`
+    ? `${sectionLabel} rank #${stats.rank} • ${stats.correct}/${stats.total} correct • ${stats.score.toFixed(1)} score`
     : `${stats.correct}/${stats.total} correct • ${stats.score.toFixed(1)} score`;
 
   body.innerHTML = `
@@ -1801,27 +1814,37 @@ async function refreshLobbyHallOfFame() {
   if (!el) return;
   el.innerHTML = await renderLeaderboard({
     title: false,
-    limit: 10,
     emptyMessage: 'No solo runs yet. Start one and set the first score.',
   });
 }
 
+function formatLeaderboardDate(startedAt) {
+  if (startedAt == null || startedAt === '') return '—';
+  const date = new Date(startedAt * 1000);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function buildLeaderboardTable(entries, options = {}) {
-  const { title, currentSessionId } = options;
+  const { title, currentSessionId, heading, showMedals } = options;
 
   let html = '';
+  if (heading) {
+    html += `<div class="leaderboard-section"><div class="leaderboard-section-title">${heading}</div>`;
+  }
   if (title) {
     html += `<div class="help-text" style="margin-bottom:12px">${title}</div>`;
   }
 
   html += `<table class="leaderboard-table"><thead><tr>
-    <th>#</th><th>Player</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th><th class="leaderboard-action-header">Run</th>
+    <th>#</th><th>Player</th><th>Date</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Score</th><th class="leaderboard-action-header">Run</th>
   </tr></thead><tbody>`;
 
   for (const e of entries) {
     const isYou = currentSessionId && e.session_id === currentSessionId;
-    const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : e.rank;
-    const rc = e.rank <= 3 ? `rank-${e.rank}` : '';
+    const useMedals = showMedals && e.section === 'record';
+    const medal = useMedals && e.rank === 1 ? '🥇' : useMedals && e.rank === 2 ? '🥈' : useMedals && e.rank === 3 ? '🥉' : e.rank;
+    const rc = useMedals && e.rank <= 3 ? `rank-${e.rank}` : '';
     const safeName = escapeHtml(e.name);
     const actionHtml = e.state === 'ended'
       ? `<button class="leaderboard-action-btn" onclick="openLeaderboardRun('${e.session_id}')">View Run</button>`
@@ -1829,6 +1852,7 @@ function buildLeaderboardTable(entries, options = {}) {
     html += `<tr class="${isYou ? 'you' : ''}">
       <td class="${rc}">${medal}</td>
       <td>${safeName}${isYou ? ' (you)' : ''}</td>
+      <td>${formatLeaderboardDate(e.started_at)}</td>
       <td>${e.correct}/${e.total}</td>
       <td>${e.accuracy}%</td>
       <td>${e.avg_time}s</td>
@@ -1837,25 +1861,48 @@ function buildLeaderboardTable(entries, options = {}) {
     </tr>`;
   }
 
-  return html + '</tbody></table>';
+  html += '</tbody></table>';
+  if (heading) html += '</div>';
+  return html;
 }
 
 async function renderLeaderboard(options = {}) {
-  const limit = options.limit || null;
   let emptyMessage = options.emptyMessage || 'No scores yet.';
   const title = options.title === undefined ? true : options.title;
   const res = await fetch(`${API}/api/leaderboard`);
   const data = await res.json();
-  const entries = limit ? data.slice(0, limit) : data;
+  if (!Array.isArray(data) || data.length === 0) {
+    return `<div class="empty-state">${emptyMessage}</div>`;
+  }
+  const records = data.filter(e => e.section === 'record');
+  const recent = data.filter(e => e.section === 'recent' || e.section === 'weekly');
+  const entries = records.concat(recent);
 
   if (entries.length === 0) {
     return `<div class="empty-state">${emptyMessage}</div>`;
   }
 
-  return buildLeaderboardTable(entries, {
-    title: title ? 'Best runs across the return desk.' : '',
-    currentSessionId: sessionId,
-  });
+  const intro = title ? 'Best runs across the return desk.' : '';
+  let html = '';
+  if (intro) {
+    html += `<div class="help-text" style="margin-bottom:12px">${intro}</div>`;
+  }
+  if (records.length) {
+    html += buildLeaderboardTable(records, {
+      currentSessionId: sessionId,
+      heading: 'All-time records',
+      showMedals: true,
+    });
+  }
+  if (recent.length) {
+    const allInWeek = recent.every(e => e.in_week);
+    html += buildLeaderboardTable(recent, {
+      currentSessionId: sessionId,
+      heading: allInWeek ? 'This week' : 'Recent',
+      showMedals: false,
+    });
+  }
+  return html;
 }
 
 // ── Keyboard ──

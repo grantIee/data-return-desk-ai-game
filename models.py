@@ -162,8 +162,12 @@ class LeaderboardEntry(BaseModel):
     rank: int
     session_id: str
     name: str
+    state: str
     correct: int
     total: int
     accuracy: float
     avg_time: float
     score: float
+    started_at: float
+    in_week: bool
+    section: str

@@ -14,6 +14,32 @@ from typing import Callable
 from models import GameMode, Session
 
 LOCAL_SESSION_STORE_PATH = Path(".data/session_store.json")
+LEADERBOARD_RECENT_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+
+def session_run_at(session: Session) -> float:
+    return session.started_at if session.started_at is not None else session.created_at
+
+
+def mixed_leaderboard_sessions(sessions: list[Session], limit: int, now: float | None = None) -> list[Session]:
+    scored = [session for session in sessions if session.total_count > 0]
+    scored.sort(
+        key=lambda session: (session.score, session.correct_count, -session.avg_time),
+        reverse=True,
+    )
+    cutoff = (now if now is not None else time.time()) - LEADERBOARD_RECENT_RETENTION_SECONDS
+    selected: list[Session] = []
+    seen: set[str] = set()
+    for session in scored[: max(0, limit)]:
+        seen.add(session.id)
+        selected.append(session)
+    for session in scored:
+        if session.id in seen:
+            continue
+        if session_run_at(session) >= cutoff:
+            seen.add(session.id)
+            selected.append(session)
+    return selected
 
 
 class StoreError(RuntimeError):
@@ -149,12 +175,7 @@ class JsonFileSessionStore(SessionStore):
 
     def list_top_sessions(self, limit: int = 100) -> list[Session]:
         sessions = self.list_sessions(mode=GameMode.SINGLE_PLAYER, challenge_code=None)
-        scored = [session for session in sessions if session.total_count > 0]
-        scored.sort(
-            key=lambda session: (session.score, session.correct_count, -session.avg_time),
-            reverse=True,
-        )
-        return scored[:limit]
+        return mixed_leaderboard_sessions(sessions, limit)
 
 
 class UpstashRedisSessionStore(SessionStore):
@@ -177,6 +198,10 @@ class UpstashRedisSessionStore(SessionStore):
     @property
     def _leaderboard_key(self) -> str:
         return f"{self.namespace}:leaderboard"
+
+    @property
+    def _recent_leaderboard_key(self) -> str:
+        return f"{self.namespace}:leaderboard:recent"
 
     def _session_key(self, session_id: str) -> str:
         return f"{self.namespace}:session:{session_id}"
@@ -343,7 +368,12 @@ class UpstashRedisSessionStore(SessionStore):
         session_ids = self._command(["SMEMBERS", self._sessions_key]) or []
         challenge_codes = self._command(["SMEMBERS", self._challenges_key]) or []
 
-        keys = [self._sessions_key, self._challenges_key, self._leaderboard_key]
+        keys = [
+            self._sessions_key,
+            self._challenges_key,
+            self._leaderboard_key,
+            self._recent_leaderboard_key,
+        ]
         keys.extend(self._session_key(session_id) for session_id in session_ids)
         keys.extend(self._challenge_key(challenge_code) for challenge_code in challenge_codes)
         if keys:
@@ -355,25 +385,59 @@ class UpstashRedisSessionStore(SessionStore):
         if session.total_count == 0:
             return
 
+        cutoff = time.time() - LEADERBOARD_RECENT_RETENTION_SECONDS
         self._pipeline(
             [
                 ["ZADD", self._leaderboard_key, session.score, session.id],
                 ["ZREMRANGEBYRANK", self._leaderboard_key, 0, -101],
+                ["ZADD", self._recent_leaderboard_key, session_run_at(session), session.id],
+                ["ZREMRANGEBYSCORE", self._recent_leaderboard_key, "-inf", cutoff],
             ]
         )
 
-    def list_top_sessions(self, limit: int = 100) -> list[Session]:
-        member_ids = self._command(["ZREVRANGE", self._leaderboard_key, 0, max(0, limit - 1)]) or []
-        if not member_ids:
+    def _fetch_sessions(self, session_ids: list) -> list[Session]:
+        if not session_ids:
             return []
-
-        commands = [["GET", self._session_key(session_id)] for session_id in member_ids]
+        commands = [["GET", self._session_key(session_id)] for session_id in session_ids]
         results = self._pipeline(commands)
         return [
             session
             for session in (self._deserialize_session(raw) for raw in results)
             if session is not None
         ]
+
+    def _backfill_recent_leaderboard(self, score_ids: list) -> None:
+        if not score_ids:
+            return
+        recent_count = int(self._command(["ZCARD", self._recent_leaderboard_key]) or 0)
+        if recent_count > 0:
+            return
+
+        sessions = self._fetch_sessions(score_ids)
+        commands = [
+            ["ZADD", self._recent_leaderboard_key, session_run_at(session), session.id]
+            for session in sessions
+            if session.total_count > 0
+        ]
+        if commands:
+            self._pipeline(commands)
+
+    def list_top_sessions(self, limit: int = 100) -> list[Session]:
+        score_ids = self._command(["ZREVRANGE", self._leaderboard_key, 0, max(0, limit - 1)]) or []
+        self._backfill_recent_leaderboard(score_ids)
+
+        cutoff = time.time() - LEADERBOARD_RECENT_RETENTION_SECONDS
+        recent_ids = self._command(["ZRANGEBYSCORE", self._recent_leaderboard_key, cutoff, "+inf"]) or []
+
+        member_ids: list[str] = []
+        seen: set[str] = set()
+        for session_id in list(score_ids) + list(recent_ids):
+            if session_id in seen:
+                continue
+            seen.add(session_id)
+            member_ids.append(session_id)
+
+        return self._fetch_sessions(member_ids)
 
 
 def create_session_store() -> SessionStore:

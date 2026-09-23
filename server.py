@@ -31,6 +31,9 @@ DEFAULT_CUSTOMER_COUNT = int(os.environ.get("CUSTOMER_COUNT", "500"))
 SESSION_DURATION_MINUTES = int(os.environ.get("GAME_DURATION", "20"))
 DECK_SIZE = int(os.environ.get("DECK_SIZE", "100"))
 ADMIN_CODE = os.environ.get("ADMIN_CODE")
+LEADERBOARD_WEEK_SECONDS = 7 * 24 * 60 * 60
+LEADERBOARD_RECORD_SLOTS = 3
+LEADERBOARD_RECENT_SLOTS = 7
 
 app = FastAPI(title="The Return Desk")
 
@@ -192,7 +195,17 @@ def session_summary(session: Session, now: float | None = None) -> dict:
     }
 
 
+def _score_sort_key(entry: dict[str, Any]) -> tuple:
+    return (-entry["score"], -entry["correct"], entry["avg_time"], entry["session_id"])
+
+
+def _recency_sort_key(entry: dict[str, Any]) -> tuple:
+    return (-entry["started_at"], -entry["score"], -entry["correct"], entry["avg_time"], entry["session_id"])
+
+
 def build_leaderboard_entries() -> list[dict[str, Any]]:
+    now = time.time()
+    week_cutoff = now - LEADERBOARD_WEEK_SECONDS
     entries = []
     for session in session_store.list_top_sessions(limit=100):
         if session.total_count == 0:
@@ -202,25 +215,41 @@ def build_leaderboard_entries() -> list[dict[str, Any]]:
         if session.total_count > deck_len:
             continue
 
+        started_at = session.started_at if session.started_at is not None else session.created_at
         entries.append(
             {
                 "session_id": session.id,
                 "name": session.name,
-                "state": get_session_state(session),
+                "state": get_session_state(session, now),
                 "correct": session.correct_count,
                 "total": session.total_count,
                 "accuracy": round(session.accuracy * 100, 1),
                 "avg_time": round(session.avg_time, 2),
                 "score": round(session.score, 1),
+                "started_at": started_at,
+                "in_week": started_at >= week_cutoff,
             }
         )
 
-    entries.sort(key=lambda entry: (entry["score"], entry["correct"], -entry["avg_time"]), reverse=True)
+    entries.sort(key=_score_sort_key)
 
-    for index, entry in enumerate(entries, start=1):
+    records = entries[:LEADERBOARD_RECORD_SLOTS]
+    record_ids = {entry["session_id"] for entry in records}
+    rest = [entry for entry in entries if entry["session_id"] not in record_ids]
+    fresh = [entry for entry in rest if entry["in_week"]]
+    fresh.sort(key=_score_sort_key)
+    older = [entry for entry in rest if not entry["in_week"]]
+    older.sort(key=_recency_sort_key)
+    recent = (fresh + older)[:LEADERBOARD_RECENT_SLOTS]
+
+    for index, entry in enumerate(records, start=1):
+        entry["section"] = "record"
+        entry["rank"] = index
+    for index, entry in enumerate(recent, start=1):
+        entry["section"] = "recent"
         entry["rank"] = index
 
-    return entries
+    return records + recent
 
 
 def current_customer_for_session(session: Session) -> Customer | None:
@@ -539,6 +568,9 @@ async def get_public_run_breakdown(session_id: str):
         "name": summary["name"],
         "state": summary["state"],
         "rank": leaderboard_entry["rank"] if leaderboard_entry else None,
+        "section": leaderboard_entry["section"] if leaderboard_entry else None,
+        "in_week": leaderboard_entry["in_week"] if leaderboard_entry else None,
+        "started_at": session.started_at if session.started_at is not None else session.created_at,
         "correct": summary["correct"],
         "total": summary["total"],
         "accuracy": summary["accuracy"],
